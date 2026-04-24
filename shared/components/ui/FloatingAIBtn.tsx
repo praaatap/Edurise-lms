@@ -1,7 +1,6 @@
-import { Colors } from '@/core/theme/colors';
 import { useRouter } from 'expo-router';
 import { BotMessageSquare } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,

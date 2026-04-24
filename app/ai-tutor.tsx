@@ -4,7 +4,7 @@ import { useAIStore } from '@/features/ai/store/aiStore';
 import { LegendList } from '@legendapp/list';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Bot, SendHorizonal, Sparkles, User, Lightbulb } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,

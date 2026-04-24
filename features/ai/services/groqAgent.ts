@@ -3,6 +3,11 @@ import { useCourseStore } from '../../courses/store/courseStore';
 import OpenAI from 'openai';
 
 // Initialize OpenAI SDK pointing to Groq
+/**
+ * 🛠️ SETUP INSTRUCTIONS:
+ * 1. Get your API Key from https://console.groq.com/
+ * 2. Add it to your `.env` or `.env.local` file as `EXPO_PUBLIC_GROQ_API_KEY`
+ */
 const openai = new OpenAI({
   baseURL: 'https://api.groq.com/openai/v1',
   apiKey: process.env.EXPO_PUBLIC_GROQ_API_KEY || 'gsk_placeholder_replace_me',
@@ -73,7 +78,7 @@ export const processUserMessage = async (userMessage: string) => {
     if (responseMessage.tool_calls) {
       conversationContext.push(responseMessage); // Add assistant tool call
 
-      for (const toolCall of responseMessage.tool_calls) {
+      for (const toolCall of responseMessage.tool_calls as any[]) {
         if (toolCall.function.name === 'get_courses') {
           const courses = getAvailableCourses();
           conversationContext.push({
@@ -129,5 +134,34 @@ export const processUserMessage = async (userMessage: string) => {
       : "Sorry, I'm having trouble connecting to my neural network right now. Please try again later.";
       
     addMessage({ text: fallbackMsg, sender: 'ai' });
+  }
+};
+
+export const smartSearch = async (query: string): Promise<string[]> => {
+  try {
+    const { courses } = useCourseStore.getState();
+    const courseContext = courses.map(c => ({ id: c.id, title: c.title, category: c.category, description: c.description }));
+
+    const response = await openai.chat.completions.create({
+      model: 'llama3-8b-8192',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are a course recommendation engine. Given a list of courses and a user intent, return a JSON array of course IDs that best match the intent. ONLY return the JSON array, nothing else.' 
+        },
+        { 
+          role: 'user', 
+          content: `Courses: ${JSON.stringify(courseContext)}\nUser Intent: ${query}` 
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const content = response.choices[0].message.content || '{"ids": []}';
+    const parsed = JSON.parse(content);
+    return parsed.ids || [];
+  } catch (error) {
+    console.error("Smart Search Error:", error);
+    return [];
   }
 };

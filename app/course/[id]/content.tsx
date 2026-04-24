@@ -7,30 +7,45 @@ import {
   scheduleCourseReengagementReminder,
 } from '@/features/notifications/services/notificationService';
 import { OfflineBanner } from '@/shared/components/ui/OfflineBanner';
+import { CustomDialog } from '@/shared/components/ui/CustomDialog';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, TriangleAlert } from 'lucide-react-native';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Pencil, TriangleAlert, X } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import * as Haptics from 'expo-haptics';
 
 export default function CourseContentScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { getCourseById, completeCourse, updateQuizScore } = useCourseStore();
+  const { getCourseById, completeCourse, updateQuizScore, addNote } = useCourseStore();
   const { user, token } = useAuthStore();
   const webViewRef = useRef<WebView>(null);
 
   const [progress, setProgress] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [webViewError, setWebViewError] = useState<string | null>(null);
+  const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
+  const [noteText, setNoteText] = useState('');
   const shouldScheduleReminderRef = useRef(true);
+
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+    confirmText?: string;
+    type?: 'default' | 'destructive' | 'success';
+  }>({ visible: false, title: '', message: '' });
 
   const course = useMemo(() => getCourseById(id as string), [id, getCourseById]);
 
@@ -66,14 +81,36 @@ export default function CourseContentScreen() {
         shouldScheduleReminderRef.current = false;
         completeCourse(id as string);
         void clearCourseReminderNotification();
-        Alert.alert('Course Completed', 'Congratulations! Great progress.');
-        router.back();
+        setDialogConfig({
+          visible: true,
+          title: 'Course Completed',
+          message: 'Congratulations! Great progress. You have unlocked a new achievement.',
+          confirmText: 'Awesome',
+          type: 'success',
+          onConfirm: () => router.back()
+        });
       } else if (data.type === 'QUIZ_SCORE') {
         updateQuizScore(id as string, data.score);
       }
     } catch {
       setWebViewError('Could not process content interaction. Please reload and try again.');
     }
+  };
+
+  const saveNote = () => {
+    if (!noteText.trim()) return;
+    addNote(id as string, noteText.trim());
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setNoteText('');
+    setIsNoteModalVisible(false);
+    
+    setDialogConfig({
+      visible: true,
+      title: 'Note Saved',
+      message: 'Your learning note has been saved to this course and is available in your profile.',
+      confirmText: 'Perfect',
+      type: 'success'
+    });
   };
 
   useEffect(() => {
@@ -107,7 +144,6 @@ export default function CourseContentScreen() {
             className="mt-6 bg-primary rounded-xl px-5 py-3"
             onPress={() => {
               setWebViewError(null);
-              setIsLoading(true);
               webViewRef.current?.reload();
             }}
           >
@@ -120,6 +156,18 @@ export default function CourseContentScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface">
+      <CustomDialog
+        visible={dialogConfig.visible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        confirmText={dialogConfig.confirmText}
+        type={dialogConfig.type}
+        onConfirm={() => {
+          dialogConfig.onConfirm?.();
+          setDialogConfig(prev => ({ ...prev, visible: false }));
+        }}
+        onCancel={() => setDialogConfig(prev => ({ ...prev, visible: false }))}
+      />
       <OfflineBanner />
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
         <TouchableOpacity className="w-10 h-10 items-center justify-center" onPress={() => router.back()}>
@@ -140,11 +188,9 @@ export default function CourseContentScreen() {
           className="flex-1"
           injectedJavaScriptBeforeContentLoaded={injectedJS}
           onLoadStart={() => {
-            setIsLoading(true);
             setWebViewError(null);
           }}
           onLoadEnd={() => {
-            setIsLoading(false);
             webViewRef.current?.postMessage(
               JSON.stringify({
                 type: 'NATIVE_HEADERS',
@@ -171,6 +217,61 @@ export default function CourseContentScreen() {
           )}
         />
       </View>
+
+      {/* Note FAB */}
+      <TouchableOpacity
+        className="absolute bottom-10 right-6 w-16 h-16 bg-primary rounded-full items-center justify-center shadow-xl z-50 border-4 border-white"
+        activeOpacity={0.9}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setIsNoteModalVisible(true);
+        }}
+      >
+        <Pencil color="white" size={28} />
+      </TouchableOpacity>
+
+      {/* Note Modal */}
+      <Modal
+        visible={isNoteModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsNoteModalVisible(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <View className="flex-1 bg-black/40 justify-end">
+            <View className="bg-white rounded-t-[40px] p-6 h-[70%]">
+              <View className="flex-row justify-between items-center mb-6">
+                <Text className="text-2xl font-extrabold text-text">Quick Note</Text>
+                <TouchableOpacity onPress={() => setIsNoteModalVisible(false)} className="p-2 bg-gray-100 rounded-full">
+                  <X size={20} color={Colors.text} />
+                </TouchableOpacity>
+              </View>
+              
+              <View className="flex-1 bg-surface border border-border/50 rounded-3xl p-4">
+                <TextInput
+                  className="text-base text-text leading-6"
+                  placeholder="Type your notes about this lesson here..."
+                  multiline
+                  autoFocus
+                  textAlignVertical="top"
+                  value={noteText}
+                  onChangeText={setNoteText}
+                />
+              </View>
+
+              <TouchableOpacity
+                className="mt-6 bg-primary py-4 rounded-2xl items-center justify-center shadow-lg"
+                onPress={saveNote}
+              >
+                <Text className="text-white text-lg font-bold">Save Note</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }

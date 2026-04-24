@@ -142,4 +142,44 @@ describe('courseStore State Management', () => {
             expect(useCourseStore.getState().filteredCourses.length).toBe(2);
         });
     });
+
+  describe('Timeline Events', () => {
+    it('should add a timeline event when a course is bookmarked', () => {
+      const mockCourse = { id: 'c1', title: 'Test Course' } as any;
+      useCourseStore.setState({ courses: [mockCourse] });
+      const { toggleBookmark } = useCourseStore.getState();
+
+      toggleBookmark('c1');
+
+      const timeline = useCourseStore.getState().timeline;
+      expect(timeline.length).toBe(1);
+      expect(timeline[0].courseId).toBe('c1');
+      expect(timeline[0].type).toBe('bookmark');
+    });
+
+    it('should limit timeline to 20 events', () => {
+      const { addTimelineEvent } = useCourseStore.getState();
+      
+      for (let i = 0; i < 25; i++) {
+        addTimelineEvent({
+          courseId: `c${i}`,
+          title: `Title ${i}`,
+          action: `Action ${i}`,
+          type: 'enroll'
+        });
+      }
+
+      expect(useCourseStore.getState().timeline.length).toBe(20);
+    });
+  });
+
+  describe('AI Recommendations', () => {
+    it('should update aiRecommendedIds', () => {
+      const { setAiRecommendedIds } = useCourseStore.getState();
+      
+      setAiRecommendedIds(['id1', 'id2']);
+      
+      expect(useCourseStore.getState().aiRecommendedIds).toEqual(['id1', 'id2']);
+    });
+  });
 });

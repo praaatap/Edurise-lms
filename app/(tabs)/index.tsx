@@ -7,8 +7,8 @@ import { SkeletonCard } from '@/shared/components/ui/SkeletonCard';
 import { Course } from '@/shared/types';
 import { LegendList } from '@legendapp/list';
 import { Href, useRouter } from 'expo-router';
-import { BookOpen, Compass, Sparkles, TrendingUp, Trophy } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { BookOpen, Compass, Flame } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, SafeAreaView, ScrollView, Text, TouchableOpacity, View  , Image} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,6 +27,8 @@ function useHomeLogic() {
     toggleBookmark,
     enrolledCourses,
     completedCourses,
+    streak,
+    updateStreak,
   } = useCourseStore();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -34,6 +36,7 @@ function useHomeLogic() {
   useEffect(() => {
     const init = async () => {
       await fetchCourses();
+      updateStreak();
       getAIRecommendations(['Technology', 'Design', 'Development']);
     };
     init();
@@ -42,6 +45,7 @@ function useHomeLogic() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await refreshCourses();
+    updateStreak();
     getAIRecommendations(['Technology', 'Design', 'Development']);
     setIsRefreshing(false);
   }, [refreshCourses, getAIRecommendations]);
@@ -72,6 +76,7 @@ function useHomeLogic() {
     handleCoursePress,
     inProgressCourses,
     firstName,
+    streak,
   };
 }
 
@@ -83,13 +88,11 @@ export default function HomeScreen() {
     isLoading,
     bookmarks,
     toggleBookmark,
-    enrolledCourses,
-    completedCourses,
     isRefreshing,
     handleRefresh,
     handleCoursePress,
-    inProgressCourses,
     firstName,
+    streak,
   } = useHomeLogic();
 
   const renderItem = useCallback(({ item }: { item: Course }) => (
@@ -122,12 +125,20 @@ export default function HomeScreen() {
             Hi, {firstName}
           </Text>
           <Text className="text-base text-slate-500 font-medium mt-1">
-            What would you like to learn?
+            What would you like to learn today?
           </Text>
         </View>
-        <TouchableOpacity className="w-12 h-12 bg-secondary rounded-full items-center justify-center">
-          <BookOpen size={24} color={Colors.primary} />
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-3">
+          {streak > 0 && (
+            <View className="flex-row items-center bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+              <Flame size={18} color="#F97316" fill="#F97316" />
+              <Text className="ml-1.5 text-sm font-black text-orange-600">{streak}</Text>
+            </View>
+          )}
+          <TouchableOpacity className="w-12 h-12 bg-secondary rounded-full items-center justify-center">
+            <BookOpen size={24} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Popular Teachers */}

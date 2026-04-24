@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from 'axios';
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { analytics } from "@/core/services/analyticsService";
 
 interface TimelineEvent {
   id: string;
@@ -25,19 +26,26 @@ interface CourseState {
   completedCourses: string[];
   quizScores: Record<string, number>;
   timeline: TimelineEvent[];
+  notes: Record<string, string[]>; // courseId -> array of note strings
   isLoading: boolean;
   error: string | null;
   searchQuery: string;
   lastFetched: number | null;
+  streak: number;
+  lastStreakUpdate: number | null;
+  aiRecommendedIds: string[];
 
   fetchCourses: () => Promise<void>;
   getAIRecommendations: (interests: string[]) => Promise<void>;
+  setAiRecommendedIds: (ids: string[]) => void;
   searchCourses: (query: string) => void;
   toggleBookmark: (courseId: string) => void;
   enrollCourse: (courseId: string) => void;
   unenrollCourse: (courseId: string) => void;
   completeCourse: (courseId: string) => void;
   updateQuizScore: (courseId: string, score: number) => void;
+  addNote: (courseId: string, note: string) => void;
+  updateStreak: () => void;
   refreshCourses: () => Promise<void>;
   getCourseById: (id: string) => Course | undefined;
   addTimelineEvent: (event: Omit<TimelineEvent, 'id' | 'timestamp'>) => void;
@@ -78,10 +86,14 @@ export const useCourseStore = create<CourseState>()(
       completedCourses: [],
       quizScores: {},
       timeline: [],
+      notes: {},
       isLoading: false,
       error: null,
       searchQuery: "",
       lastFetched: null,
+      streak: 0,
+      lastStreakUpdate: null,
+      aiRecommendedIds: [],
 
       addTimelineEvent: (event) => {
         const { timeline } = get();
@@ -141,6 +153,10 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
+      setAiRecommendedIds: (ids: string[]) => {
+        set({ aiRecommendedIds: ids });
+      },
+
       searchCourses: (query: string) => {
 
         const { courses } = get();
@@ -169,6 +185,7 @@ export const useCourseStore = create<CourseState>()(
 
         if (isBookmarked) {
           newBookmarks = bookmarks.filter((id) => id !== courseId);
+          analytics.logEvent('course_bookmark', { courseId, action: 'removed' });
         } else {
           newBookmarks = [...bookmarks, courseId];
           const course = courses.find((c) => c.id === courseId);
@@ -180,6 +197,7 @@ export const useCourseStore = create<CourseState>()(
               type: 'bookmark',
             });
           }
+          analytics.logEvent('course_bookmark', { courseId, action: 'added' });
         }
 
         set({ bookmarks: newBookmarks });
@@ -203,6 +221,7 @@ export const useCourseStore = create<CourseState>()(
               type: 'enroll',
             });
           }
+          analytics.logEvent('course_enroll', { courseId });
         }
       },
 
@@ -265,6 +284,40 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
+      addNote: (courseId, note) => {
+        const { notes } = get();
+        const courseNotes = notes[courseId] || [];
+        set({
+          notes: {
+            ...notes,
+            [courseId]: [note, ...courseNotes],
+          },
+        });
+      },
+
+      updateStreak: () => {
+        const { streak, lastStreakUpdate } = get();
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+        if (!lastStreakUpdate) {
+          set({ streak: 1, lastStreakUpdate: today });
+          return;
+        }
+
+        const lastUpdate = new Date(lastStreakUpdate);
+        const lastDay = new Date(lastUpdate.getFullYear(), lastUpdate.getMonth(), lastUpdate.getDate()).getTime();
+
+        const diff = today - lastDay;
+        const oneDay = 24 * 60 * 60 * 1000;
+
+        if (diff === oneDay) {
+          set({ streak: streak + 1, lastStreakUpdate: today });
+        } else if (diff > oneDay) {
+          set({ streak: 1, lastStreakUpdate: today });
+        }
+      },
+
       refreshCourses: async () => {
         set({ lastFetched: null, error: null });
         await get().fetchCourses();
@@ -284,7 +337,10 @@ export const useCourseStore = create<CourseState>()(
         completedCourses: state.completedCourses,
         quizScores: state.quizScores,
         timeline: state.timeline,
+        notes: state.notes,
         lastFetched: state.lastFetched,
+        streak: state.streak,
+        lastStreakUpdate: state.lastStreakUpdate,
       }),
     },
   ),

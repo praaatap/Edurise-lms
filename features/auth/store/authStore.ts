@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { authApi, LoginPayload, RegisterPayload } from "@/features/auth/api/authApi";
 import { User } from "@/shared/types";
+import { analytics } from "@/core/services/analyticsService";
 
 interface AuthState {
   user: User | null;
@@ -46,6 +47,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
+          analytics.logEvent('login_success', { userId: res.data.user._id });
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -61,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
             email: data.email,
             password: data.password,
           });
+          analytics.logEvent('register_success');
         } catch (error) {
           set({ isLoading: false });
           throw error;

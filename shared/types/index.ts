@@ -30,4 +30,7 @@ export interface User {
   avatar: { url: string; localPath: string };
   role: string;
   isEmailVerified: boolean;
+  level?: number;
+  xp?: number;
+  badges?: string[];
 }

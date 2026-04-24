@@ -1,7 +1,7 @@
 import NetInfo from '@react-native-community/netinfo';
 import { WifiOff } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Text } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

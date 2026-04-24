@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Text } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useNetworkStatus } from '../../utils/network';

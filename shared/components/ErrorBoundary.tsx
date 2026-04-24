@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, SafeAreaView } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { Button } from './ui/Button';
