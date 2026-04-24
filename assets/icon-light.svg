@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Solid Background (No rounded corners, standard for Expo base icons) -->
+  <rect width="1024" height="1024" fill="#F8FAFC" />
+  
+  <!-- Subtle Shadow for depth -->
+  <rect x="252" y="312" width="520" height="460" fill="#E2E8F0" rx="60" />
+  
+  <!-- Main Book Covers -->
+  <path d="M512 730V270C512 270 420 230 270 270V730C420 690 512 730 512 730Z" fill="#3B82F6" />
+  <path d="M512 730V270C512 270 604 230 754 270V730C604 690 512 730 512 730Z" fill="#60A5FA" />
+  
+  <!-- Pages Left -->
+  <path d="M310 330H470V370H310V330Z" fill="#EFF6FF" opacity="0.85" />
+  <path d="M310 410H470V450H310V410Z" fill="#EFF6FF" opacity="0.85" />
+  <path d="M310 490H420V530H310V490Z" fill="#EFF6FF" opacity="0.85" />
+  
+  <!-- Pages Right -->
+  <path d="M554 330H714V370H554V330Z" fill="#EFF6FF" opacity="0.85" />
+  <path d="M554 410H714V450H554V410Z" fill="#EFF6FF" opacity="0.85" />
+  <path d="M554 490H664V530H554V490Z" fill="#EFF6FF" opacity="0.85" />
+  
+  <!-- Course Bookmark Marker -->
+  <path d="M620 250V450L660 410L700 450V250H620Z" fill="#F59E0B" />
+</svg>

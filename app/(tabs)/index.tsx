@@ -1,98 +1,257 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Colors } from '@/core/theme/colors';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import { CourseCard } from '@/features/courses/components/CourseCard';
+import { useCourseStore } from '@/features/courses/store/courseStore';
+import { EmptyState } from '@/shared/components/ui/EmptyState';
+import { SkeletonCard } from '@/shared/components/ui/SkeletonCard';
+import { Course } from '@/shared/types';
+import { LegendList } from '@legendapp/list';
+import { Href, useRouter } from 'expo-router';
+import { BookOpen, Compass, Sparkles, TrendingUp, Trophy } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, SafeAreaView, ScrollView, Text, TouchableOpacity, View  , Image} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+function useHomeLogic() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const user = useAuthStore((s) => s.user);
+  const {
+    courses,
+    recommendedCourses,
+    isLoading,
+    fetchCourses,
+    refreshCourses,
+    getAIRecommendations,
+    bookmarks,
+    toggleBookmark,
+    enrolledCourses,
+    completedCourses,
+  } = useCourseStore();
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  useEffect(() => {
+    const init = async () => {
+      await fetchCourses();
+      getAIRecommendations(['Technology', 'Design', 'Development']);
+    };
+    init();
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refreshCourses();
+    getAIRecommendations(['Technology', 'Design', 'Development']);
+    setIsRefreshing(false);
+  }, [refreshCourses, getAIRecommendations]);
+
+  const handleCoursePress = useCallback((course: Course) => {
+    router.push(`/course/${course.id}` as Href);
+  }, [router]);
+
+  // Enrolled but not completed = "In Progress"
+  const inProgressCourses = useMemo(() =>
+    courses.filter(c => enrolledCourses.includes(c.id) && !completedCourses.includes(c.id)),
+    [courses, enrolledCourses, completedCourses]
   );
+
+  const firstName = user?.username?.split(' ')[0] ?? 'Explorer';
+
+  return {
+    insets,
+    courses,
+    recommendedCourses,
+    isLoading,
+    bookmarks,
+    toggleBookmark,
+    enrolledCourses,
+    completedCourses,
+    isRefreshing,
+    handleRefresh,
+    handleCoursePress,
+    inProgressCourses,
+    firstName,
+  };
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+export default function HomeScreen() {
+  const {
+    insets,
+    courses,
+    recommendedCourses,
+    isLoading,
+    bookmarks,
+    toggleBookmark,
+    enrolledCourses,
+    completedCourses,
+    isRefreshing,
+    handleRefresh,
+    handleCoursePress,
+    inProgressCourses,
+    firstName,
+  } = useHomeLogic();
+
+  const renderItem = useCallback(({ item }: { item: Course }) => (
+    <View className="mb-5">
+      <CourseCard
+        course={item}
+        onPress={handleCoursePress}
+        onToggleBookmark={toggleBookmark}
+        isBookmarked={bookmarks.includes(item.id)}
+      />
+    </View>
+  ), [handleCoursePress, toggleBookmark, bookmarks]);
+
+  const uniqueInstructors = useMemo(() => {
+    const map = new Map();
+    courses.forEach(c => {
+      if (!map.has(c.instructor.name)) {
+        map.set(c.instructor.name, c.instructor);
+      }
+    });
+    return Array.from(map.values());
+  }, [courses]);
+
+  const ListHeader = useMemo(() => (
+    <View className="mb-2">
+      {/* Greeting Header */}
+      <View className="mb-6 mt-4 flex-row justify-between items-center px-4">
+        <View>
+          <Text className="text-3xl font-extrabold text-slate-800 tracking-tight">
+            Hi, {firstName}
+          </Text>
+          <Text className="text-base text-slate-500 font-medium mt-1">
+            What would you like to learn?
+          </Text>
+        </View>
+        <TouchableOpacity className="w-12 h-12 bg-secondary rounded-full items-center justify-center">
+          <BookOpen size={24} color={Colors.primary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Popular Teachers */}
+      {uniqueInstructors.length > 0 && (
+        <View className="mb-8">
+          <View className="flex-row justify-between items-center px-4 mb-4">
+            <Text className="text-xl font-bold text-slate-800">Popular Teacher</Text>
+            <TouchableOpacity>
+              <Text className="text-primary font-bold">Sell All →</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 20 }}
+          >
+            {uniqueInstructors.map((inst, idx) => (
+              <View key={`inst-${idx}`} className="items-center">
+                <Image 
+                  source={inst.avatar} 
+                  className="w-16 h-16 rounded-full mb-2" 
+                />
+                <Text className="text-slate-800 font-semibold text-sm">{inst.name}</Text>
+                <Text className="text-slate-500 text-xs">{inst.role || 'Instructor'}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Recommended / Tech Courses */}
+      {recommendedCourses.length > 0 && (
+        <View className="mb-8">
+          <View className="flex-row items-center mb-4 px-4">
+            <Text className="text-xl font-bold text-slate-800">Tech Courses</Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingLeft: 16, paddingRight: 16, gap: 16 }}
+          >
+            {recommendedCourses.map((course) => (
+              <View key={`rec-${course.id}`} className="w-72">
+                <CourseCard
+                  course={course}
+                  onPress={handleCoursePress}
+                  onToggleBookmark={toggleBookmark}
+                  isBookmarked={bookmarks.includes(course.id)}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <View className="mb-4 px-4 flex-row items-center">
+        <Text className="text-xl font-bold text-slate-800">
+          All Courses
+        </Text>
+      </View>
+    </View>
+  ), [
+    firstName,
+    uniqueInstructors,
+    recommendedCourses,
+    handleCoursePress,
+    toggleBookmark,
+    bookmarks,
+  ]);
+
+  const ListEmpty = useMemo(() => {
+    if (isLoading) return null;
+    return (
+      <View className="mt-14">
+        <EmptyState
+          icon={Compass}
+          title="No courses available"
+          message="Check back later for new courses."
+        />
+      </View>
+    );
+  }, [isLoading]);
+
+  // Loading State UI
+  if (isLoading && courses.length === 0) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="px-4">
+          {[1, 2, 3].map((i) => (
+            <View key={i} className="mb-5">
+              <SkeletonCard />
+            </View>
+          ))}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <View className="absolute top-0 left-0 right-0 bg-background z-10" style={{ height: insets.top }} />
+
+      <LegendList
+        data={courses}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        estimatedItemSize={340}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: insets.bottom + 20,
+          paddingTop: insets.top
+        }}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={ListEmpty}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+            progressViewOffset={insets.top}
+          />
+        }
+      />
+    </View>
+  );
+}
