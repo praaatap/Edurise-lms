@@ -1,4 +1,5 @@
 import { Colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme/useTheme';
 import { CourseCard } from '@/features/courses/components/CourseCard';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
@@ -9,17 +10,19 @@ import * as Haptics from 'expo-haptics';
 import { Href, useRouter } from 'expo-router';
 import { Bookmark, Share2, Trash2, Video } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Share, Text, TouchableOpacity, View } from 'react-native';
+import { Share, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BookmarksScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { courses, bookmarks, toggleBookmark, enrollCourse } = useCourseStore();
+  const { width } = useWindowDimensions();
+  const { courses, bookmarks, toggleBookmark, enrollCourse, refreshCourses, isLoading } = useCourseStore();
+  const { C, isDark } = useTheme();
 
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ['35%'], []);
+  const snapPoints = useMemo(() => ['45%'], []);
 
   const bookmarkedCourses = useMemo(() =>
     courses.filter(c => bookmarks.includes(c.id)),
@@ -39,7 +42,7 @@ export default function BookmarksScreen() {
   const handleAction = useCallback(async (action: 'delete' | 'share' | 'enroll') => {
     if (!selectedCourse) return;
     bottomSheetRef.current?.close();
-    
+
     setTimeout(async () => {
       if (action === 'delete') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -63,8 +66,9 @@ export default function BookmarksScreen() {
 
   const renderItem = useCallback(({ item }: { item: Course }) => (
     <View className="mb-5">
-      <TouchableOpacity 
-        activeOpacity={0.9} 
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => handleCoursePress(item)}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={400}
       >
@@ -78,11 +82,17 @@ export default function BookmarksScreen() {
         </View>
       </TouchableOpacity>
     </View>
-  ), [handleLongPress]);
+  ), [handleLongPress, handleCoursePress]);
+
+  const handleRefresh = useCallback(async () => {
+    await refreshCourses();
+  }, [refreshCourses]);
+
+  const listPaddingHorizontal = width > 600 ? (width - 600) / 2 : 16;
 
   if (bookmarkedCourses.length === 0) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
+      <View className="flex-1 bg-background dark:bg-dark-bg items-center justify-center">
         <EmptyState
           icon={Bookmark}
           title="No Bookmarks Yet"
@@ -95,21 +105,24 @@ export default function BookmarksScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background dark:bg-dark-bg">
       <LegendList
         data={bookmarkedCourses}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         estimatedItemSize={340}
+        refreshControl={
+          <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} tintColor={Colors.primary} />
+        }
         contentContainerStyle={{
-          paddingHorizontal: 16,
+          paddingHorizontal: listPaddingHorizontal,
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 100
         }}
         ListHeaderComponent={
           <View className="px-1 mb-6">
-            <Text className="text-3xl font-extrabold text-text tracking-tighter">Saved Courses</Text>
-            <Text className="text-base text-text-muted mt-1 font-medium">Long press a course for options</Text>
+            <Text className="text-3xl font-extrabold text-text dark:text-dark-text tracking-tighter">Saved Courses</Text>
+            <Text className="text-base text-text-muted dark:text-dark-text-muted mt-1 font-medium">Long press a course for options</Text>
           </View>
         }
       />
@@ -120,36 +133,38 @@ export default function BookmarksScreen() {
         snapPoints={snapPoints}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
-        handleIndicatorStyle={{ backgroundColor: '#E2E8F0', width: 40 }}
-        backgroundStyle={{ borderRadius: 32, backgroundColor: 'white' }}
+        handleIndicatorStyle={{ backgroundColor: isDark ? '#374151' : '#E2E8F0', width: 40 }}
+        backgroundStyle={{ borderRadius: 32, backgroundColor: C.surface }}
       >
-        <BottomSheetView className="px-6 py-4">
-          <Text className="text-xl font-extrabold text-text mb-1" numberOfLines={1}>
+        <BottomSheetView className="px-6 py-4 pb-12">
+          <Text className="text-xl font-extrabold text-text dark:text-dark-text mb-1" numberOfLines={1}>
             {selectedCourse?.title}
           </Text>
-          <Text className="text-sm text-text-muted mb-6">Course Options</Text>
+          <Text className="text-sm text-text-muted dark:text-dark-text-muted mb-6">Course Options</Text>
 
-          <TouchableOpacity 
-            className="flex-row items-center bg-surface border border-border/40 p-4 rounded-2xl mb-3"
+          <TouchableOpacity
+            style={{ backgroundColor: C.surfaceElevated, borderColor: C.border }}
+            className="flex-row items-center border p-4 rounded-2xl mb-3"
             onPress={() => handleAction('enroll')}
           >
             <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center mr-4">
               <Video size={20} color={Colors.primary} />
             </View>
-            <Text className="text-base font-bold text-text">Enroll & Start Learning</Text>
+            <Text className="text-base font-bold text-text dark:text-dark-text">Enroll & Start Learning</Text>
           </TouchableOpacity>
 
           <View className="flex-row gap-3">
-            <TouchableOpacity 
-              className="flex-1 flex-row items-center justify-center bg-surface border border-border/40 p-4 rounded-2xl"
+            <TouchableOpacity
+              style={{ backgroundColor: C.surfaceElevated, borderColor: C.border }}
+              className="flex-1 flex-row items-center justify-center border p-4 rounded-2xl"
               onPress={() => handleAction('share')}
             >
-              <Share2 size={18} color={Colors.text} className="mr-2" />
-              <Text className="text-sm font-bold text-text">Share</Text>
+              <Share2 size={18} color={C.text} className="mr-2" />
+              <Text className="text-sm font-bold text-text dark:text-dark-text">Share</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              className="flex-1 flex-row items-center justify-center bg-red-50 border border-red-100 p-4 rounded-2xl"
+            <TouchableOpacity
+              className="flex-1 flex-row items-center justify-center bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/50 p-4 rounded-2xl"
               onPress={() => handleAction('delete')}
             >
               <Trash2 size={18} color="#EF4444" className="mr-2" />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme/useTheme';
 
 interface SearchBarProps {
   value: string;
@@ -14,22 +14,24 @@ export const SearchBar = React.memo(({
   onChangeText,
   placeholder = 'Search courses...'
 }: SearchBarProps) => {
+  const { C } = useTheme();
+  
   return (
-    <View className="flex-row items-center bg-surface rounded-2xl px-4 h-12 border border-border shadow-sm">
-      <Ionicons name="search-outline" size={18} color={Colors.textFaint} style={{ marginRight: 8 }} />
+    <View className="flex-row items-center bg-surface dark:bg-dark-surface-elevated rounded-2xl px-4 h-12 border border-border dark:border-dark-border shadow-sm">
+      <Ionicons name="search-outline" size={18} color={C.textMuted} style={{ marginRight: 8 }} />
       <TextInput
-        className="flex-1 text-base text-text"
+        className="flex-1 text-base text-text dark:text-dark-text"
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={Colors.textFaint}
+        placeholderTextColor={C.textMuted}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
       />
       {value.length > 0 && (
         <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="close-circle" size={18} color={Colors.textFaint} />
+          <Ionicons name="close-circle" size={18} color={C.textMuted} />
         </TouchableOpacity>
       )}
     </View>

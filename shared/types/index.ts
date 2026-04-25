@@ -4,7 +4,10 @@ export interface Instructor {
   avatar: string;
   location: string;
   email: string;
+  role?: string;
 }
+
+export type CourseLevel = 'Beginner' | 'Intermediate' | 'Advanced';
 
 export interface Course {
   id: string;
@@ -14,6 +17,7 @@ export interface Course {
   thumbnail: string;
   category: string;
   rating: number;
+  level: CourseLevel;
   instructor: Instructor;
   isBookmarked: boolean;
   isEnrolled: boolean;

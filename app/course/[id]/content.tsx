@@ -1,4 +1,5 @@
 import { Colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme/useTheme';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { generateCourseHtml } from '@/features/courses/utils/courseHtml';
@@ -26,6 +27,7 @@ import { WebView } from 'react-native-webview';
 import * as Haptics from 'expo-haptics';
 
 export default function CourseContentScreen() {
+  const { C, isDark } = useTheme();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { getCourseById, completeCourse, updateQuizScore, addNote } = useCourseStore();
@@ -60,8 +62,8 @@ export default function CourseContentScreen() {
 
   const htmlTemplate = useMemo(() => {
     if (!course) return '';
-    return generateCourseHtml(course);
-  }, [course]);
+    return generateCourseHtml(course, isDark);
+  }, [course, isDark]);
 
   const injectedJS = useMemo(() => {
     if (!course) return '';
@@ -126,7 +128,7 @@ export default function CourseContentScreen() {
 
   if (webViewError) {
     return (
-      <SafeAreaView className="flex-1 bg-surface">
+      <SafeAreaView className="flex-1" style={{ backgroundColor: C.surface }}>
         <OfflineBanner />
         <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
           <TouchableOpacity className="w-10 h-10 items-center justify-center" onPress={() => router.back()}>
@@ -155,7 +157,7 @@ export default function CourseContentScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: C.surface }}>
       <CustomDialog
         visible={dialogConfig.visible}
         title={dialogConfig.title}
@@ -171,7 +173,7 @@ export default function CourseContentScreen() {
       <OfflineBanner />
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
         <TouchableOpacity className="w-10 h-10 items-center justify-center" onPress={() => router.back()}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color={C.text} />
         </TouchableOpacity>
         <Text className="text-base font-bold text-text flex-1 text-center" numberOfLines={1}>{course.title}</Text>
         <View className="w-10" />
@@ -242,18 +244,19 @@ export default function CourseContentScreen() {
           className="flex-1"
         >
           <View className="flex-1 bg-black/40 justify-end">
-            <View className="bg-white rounded-t-[40px] p-6 h-[70%]">
+            <View className="rounded-t-[40px] p-6 h-[70%]" style={{ backgroundColor: C.surface }}>
               <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-2xl font-extrabold text-text">Quick Note</Text>
-                <TouchableOpacity onPress={() => setIsNoteModalVisible(false)} className="p-2 bg-gray-100 rounded-full">
-                  <X size={20} color={Colors.text} />
+                <Text className="text-2xl font-extrabold text-text dark:text-dark-text">Quick Note</Text>
+                <TouchableOpacity onPress={() => setIsNoteModalVisible(false)} className="p-2 rounded-full" style={{ backgroundColor: C.surfaceElevated }}>
+                  <X size={20} color={C.text} />
                 </TouchableOpacity>
               </View>
               
-              <View className="flex-1 bg-surface border border-border/50 rounded-3xl p-4">
+              <View className="flex-1 rounded-3xl p-4 border border-border/50 dark:border-dark-border" style={{ backgroundColor: C.surfaceElevated }}>
                 <TextInput
-                  className="text-base text-text leading-6"
+                  className="text-base text-text dark:text-dark-text leading-6"
                   placeholder="Type your notes about this lesson here..."
+                  placeholderTextColor={C.textMuted}
                   multiline
                   autoFocus
                   textAlignVertical="top"

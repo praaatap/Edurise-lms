@@ -10,6 +10,10 @@ type EventName =
   | 'course_bookmark'
   | 'ai_chat_open'
   | 'quiz_complete'
+  | 'search_performed'
+  | 'theme_changed'
+  | 'biometric_toggled'
+  | 'profile_image_updated'
   | 'error_occurred';
 
 class AnalyticsService {

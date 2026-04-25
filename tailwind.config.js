@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  // NOTE: Update this to include the paths to all of your component files.
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",
     "./features/**/*.{js,jsx,ts,tsx}",
@@ -8,16 +7,19 @@ module.exports = {
     "./core/**/*.{js,jsx,ts,tsx}",
   ],
   presets: [require("nativewind/preset")],
-  darkMode: 'class',
+  // NativeWind uses 'media' so dark: classes respond to the OS color scheme
+  darkMode: 'media',
   theme: {
     extend: {
       colors: {
         primary: '#22C55E',
         'primary-dark': '#16A34A',
         secondary: '#DCFCE7',
+        'secondary-dark': '#14532D',
         accent: '#FB923C',
         'primary-light': '#DCFCE7',
         'primary-lighter': '#F0FDF4',
+        // Semantic tokens — light mode
         background: '#F8FAFC',
         surface: '#FFFFFF',
         'surface-elevated': '#F1F5F9',
@@ -30,14 +32,13 @@ module.exports = {
         warning: '#F59E0B',
         bookmark: '#FB923C',
         enrolled: '#22C55E',
-        dark: {
-          background: '#0F172A',
-          surface: '#1E293B',
-          'surface-elevated': '#334155',
-          text: '#F8FAFC',
-          'text-muted': '#94A3B8',
-          border: '#334155',
-        }
+        // Explicit dark-palette tokens (used for inline styles via useTheme)
+        'dark-bg': '#000000',
+        'dark-surface': '#121212',
+        'dark-surface-elevated': '#1E1E1E',
+        'dark-text': '#F1F5F9',
+        'dark-text-muted': '#9CA3AF',
+        'dark-border': '#262626',
       },
     },
   },

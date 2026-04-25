@@ -98,6 +98,14 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // 🔴 ENHANCED ERROR LOGGING
+    console.error('============ API ERROR ============');
+    console.error('URL:', error.config?.url);
+    console.error('Status:', error.response?.status);
+    console.error('Message:', error.message);
+    console.error('Response Data:', JSON.stringify(error.response?.data, null, 2));
+    console.error('===================================');
+
     const originalRequest = error.config as RetriableRequestConfig | undefined;
 
     if (error.message === "NO_INTERNET") {

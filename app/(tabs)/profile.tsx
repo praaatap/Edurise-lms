@@ -1,45 +1,52 @@
 import { Colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme/useTheme';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { useThemeStore } from '@/core/theme/themeStore';
 import { useColorScheme } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CustomDialog } from '@/shared/components/ui/CustomDialog';
+import { analytics } from '@/core/services/analyticsService';
+import { UnsplashPicker } from '@/shared/components/ui/UnsplashPicker';
+
+import { ProfileHeader } from '@/features/auth/components/Profile/ProfileHeader';
+import { ProfileStats } from '@/features/auth/components/Profile/ProfileStats';
+import { LevelProgress } from '@/features/auth/components/Profile/LevelProgress';
+import { ProfileTimeline } from '@/features/auth/components/Profile/ProfileTimeline';
+
+const BADGES = [
+  { id: 'early-bird',   icon: 'sunny' as const,   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  title: 'Early Bird'   },
+  { id: 'fast-learner', icon: 'rocket' as const,  color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', title: 'Fast Learner' },
+  { id: 'quiz-master',  icon: 'trophy' as const,  color: '#10B981', bg: 'rgba(16,185,129,0.12)', title: 'Quiz Master'  },
+  { id: 'streak-king',  icon: 'flame' as const,   color: '#EF4444', bg: 'rgba(239,68,68,0.12)',  title: 'Streak King'  },
+];
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateProfile, localAvatar: globalLocalAvatar, setLocalAvatar: setGlobalLocalAvatar } = useAuthStore();
   const { bookmarks, enrolledCourses, completedCourses, timeline } = useCourseStore();
   const { setTheme } = useThemeStore();
   const { colorScheme, setColorScheme } = useColorScheme();
+  const { C, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    onConfirm?: () => void;
-    confirmText?: string;
+    visible: boolean; title: string; message: string;
+    onConfirm?: () => void; confirmText?: string;
     type?: 'default' | 'destructive' | 'success';
   }>({ visible: false, title: '', message: '' });
-
-  const handleThemeToggle = useCallback((isDark: boolean) => {
-    const nextTheme = isDark ? 'dark' : 'light';
-    setTheme(nextTheme);
-    setColorScheme(nextTheme);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [setTheme, setColorScheme]);
+  const [isUnsplashVisible, setIsUnsplashVisible] = useState(false);
 
   const completionProgress =
-    enrolledCourses.length === 0
-      ? 0
+    enrolledCourses.length === 0 ? 0
       : Math.round((completedCourses.length / enrolledCourses.length) * 100);
 
   const level = user?.level || 1;
@@ -48,255 +55,247 @@ export default function ProfileScreen() {
   const xpProgress = Math.min(100, (xp / xpToNextLevel) * 100);
 
   useEffect(() => {
-    const loadBiometricPref = async () => {
-      const val = await AsyncStorage.getItem('biometric_enabled');
-      setIsBiometricEnabled(val === 'true');
-    };
-    loadBiometricPref();
+    AsyncStorage.getItem('biometric_enabled').then(val => setIsBiometricEnabled(val === 'true'));
   }, []);
+
+  const handleThemeToggle = useCallback((isDarkToggle: boolean) => {
+    const nextTheme = isDarkToggle ? 'dark' : 'light';
+    setTheme(nextTheme);
+    setColorScheme(nextTheme);
+    analytics.logEvent('theme_changed', { theme: nextTheme });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [setTheme, setColorScheme]);
 
   const handleBiometricToggle = useCallback(async (nextValue: boolean) => {
     if (nextValue) {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
       if (!hasHardware || !isEnrolled) {
-        setDialogConfig({
-          visible: true,
-          title: 'Biometrics Unavailable',
-          message: 'Face ID / Touch ID is not set up on this device yet.',
-          confirmText: 'Got it',
-          type: 'default'
-        });
+        setDialogConfig({ visible: true, title: 'Biometrics Unavailable', message: 'Face ID / Touch ID is not set up on this device yet.', confirmText: 'Got it', type: 'default' });
         return;
       }
     }
-
     setIsBiometricEnabled(nextValue);
     await AsyncStorage.setItem('biometric_enabled', String(nextValue));
+    analytics.logEvent('biometric_toggled', { enabled: nextValue });
   }, []);
 
   const handleLogout = () => {
     setDialogConfig({
-      visible: true,
-      title: 'Sign Out',
+      visible: true, title: 'Sign Out',
       message: 'Are you sure you want to sign out? Your learning progress is saved!',
-      confirmText: 'Sign Out',
-      type: 'destructive',
-      onConfirm: logout
+      confirmText: 'Sign Out', type: 'destructive', onConfirm: logout,
     });
   };
+
+  const pickProfileImage = useCallback(async () => {
+    try {
+      const { status: currentStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (currentStatus === 'denied') {
+        setDialogConfig({ visible: true, title: 'Permission Required', message: 'Photo library access was denied. Please go to Settings and allow access for Edurise LMS.', confirmText: 'OK', type: 'default' });
+        return;
+      }
+      if (currentStatus !== 'granted') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          setDialogConfig({ visible: true, title: 'Permission Required', message: 'Please allow access to your photo library to update your profile picture.', confirmText: 'OK', type: 'default' });
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.length > 0) {
+        const uri = result.assets[0].uri;
+        setGlobalLocalAvatar(uri);
+        updateProfile({ avatar: { url: uri, localPath: uri } });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      setDialogConfig({ visible: true, title: 'Error', message: 'Could not open photo library. Please try again.', confirmText: 'OK', type: 'default' });
+    }
+  }, [setGlobalLocalAvatar, updateProfile]);
+
+  const handleUnsplashSelect = useCallback((url: string) => {
+    setGlobalLocalAvatar(url);
+    updateProfile({ avatar: { url, localPath: url } });
+    setIsUnsplashVisible(false);
+    analytics.logEvent('profile_image_updated', { source: 'unsplash' });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [updateProfile, setGlobalLocalAvatar]);
+
+  const showImagePickerOptions = useCallback(() => setIsUnsplashVisible(true), []);
 
   if (!user) return null;
 
   return (
-    <View className="flex-1">
+    <View style={{ flex: 1, backgroundColor: C.background }}>
       <CustomDialog
         visible={dialogConfig.visible}
         title={dialogConfig.title}
         message={dialogConfig.message}
         confirmText={dialogConfig.confirmText}
         type={dialogConfig.type}
-        onConfirm={() => {
-          dialogConfig.onConfirm?.();
-          setDialogConfig(prev => ({ ...prev, visible: false }));
-        }}
+        onConfirm={() => { dialogConfig.onConfirm?.(); setDialogConfig(prev => ({ ...prev, visible: false })); }}
         onCancel={() => setDialogConfig(prev => ({ ...prev, visible: false }))}
       />
-      <ScrollView
-        className="flex-1 bg-background"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-      >
-        {/* Header & Avatar */}
-        <View className="items-center pb-8" style={{ paddingTop: insets.top + 24 }}>
-          <View className="relative p-1 bg-white rounded-full shadow-lg">
-            <Image
-              source={user.avatar?.url || 'https://via.placeholder.com/150'}
-              className="w-28 h-28 rounded-full border-4 border-white"
-              contentFit="cover"
-            />
-          </View>
-        <Text className="text-2xl font-extrabold text-text mt-4 tracking-tighter">{user.username}</Text>
-        <View className="flex-row items-center bg-indigo-50 px-3 py-1 rounded-full mt-2">
-          <Ionicons name="flash" size={14} color={Colors.primary} />
-          <Text className="text-xs font-bold text-primary ml-1 uppercase tracking-widest">Level {level} Explorer</Text>
-        </View>
-      </View>
+      <UnsplashPicker
+        visible={isUnsplashVisible}
+        onClose={() => setIsUnsplashVisible(false)}
+        onSelect={handleUnsplashSelect}
+        onPickFromGallery={() => {
+          setIsUnsplashVisible(false);
+          // Delay ensures modal is fully dismissed before iOS shows another native controller.
+          setTimeout(() => pickProfileImage(), 500);
+        }}
+      />
 
-      {/* Level Progress */}
-      <View className="px-5 mb-8">
-        <View className="bg-white rounded-3xl p-5 shadow-sm border border-border/40">
-          <View className="flex-row justify-between items-end mb-3">
-            <View>
-                <Text className="text-sm font-bold text-text mb-1">Learning Rank</Text>
-                <Text className="text-xs text-text-muted">Mastering multiple tech tracks</Text>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+      >
+        <ProfileHeader
+          insets={insets}
+          user={user}
+          localAvatar={globalLocalAvatar}
+          level={level}
+          onPickImage={showImagePickerOptions}
+        />
+
+        <LevelProgress level={level} xp={xp} xpToNextLevel={xpToNextLevel} xpProgress={xpProgress} />
+
+        <ProfileStats enrolledCount={enrolledCourses.length} bookmarksCount={bookmarks.length} progress={completionProgress} />
+
+        {/* Achievements */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          <Text style={{ color: C.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 }}>
+            Achievements
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+            {BADGES.map(badge => (
+              <View
+                key={badge.id}
+                style={{
+                  alignItems: 'center', padding: 16, borderRadius: 20,
+                  backgroundColor: isDark ? Colors.dark.surface : '#fff',
+                  borderWidth: 1, borderColor: isDark ? Colors.dark.border : '#e2e8f0',
+                  width: 88,
+                  shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.2 : 0.05, shadowRadius: 8, elevation: 2,
+                }}
+              >
+                <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: badge.bg, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                  <Ionicons name={badge.icon} size={24} color={badge.color} />
+                </View>
+                <Text style={{ color: C.text, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{badge.title}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+
+        <ProfileTimeline timeline={timeline} />
+
+        {/* Settings */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          <Text style={{ color: C.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 }}>
+            Preferences
+          </Text>
+          <View
+            style={{
+              backgroundColor: isDark ? Colors.dark.surface : '#fff',
+              borderRadius: 24, overflow: 'hidden',
+              borderWidth: 1, borderColor: isDark ? Colors.dark.border : '#e2e8f0',
+              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: isDark ? 0.2 : 0.05, shadowRadius: 10, elevation: 2,
+            }}
+          >
+            {/* Dark Mode */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#ede9fe', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                <Ionicons name="moon" size={18} color="#6366f1" />
+              </View>
+              <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '600' }}>Dark Mode</Text>
+              <Switch value={colorScheme === 'dark'} onValueChange={handleThemeToggle} trackColor={{ false: '#D1D1D6', true: Colors.primary }} />
             </View>
-            <Text className="text-sm font-black text-primary">{Math.floor(xp)} / {xpToNextLevel} XP</Text>
+
+            <View style={{ height: 1, backgroundColor: isDark ? Colors.dark.border : '#f1f5f9', marginHorizontal: 16 }} />
+
+            {/* Notifications */}
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }} activeOpacity={0.7}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(249,115,22,0.15)' : '#fff7ed', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                <Ionicons name="notifications" size={18} color="#f97316" />
+              </View>
+              <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '600' }}>Notifications</Text>
+              <Ionicons name="chevron-forward" size={18} color={C.textMuted} />
+            </TouchableOpacity>
+
+            <View style={{ height: 1, backgroundColor: isDark ? Colors.dark.border : '#f1f5f9', marginHorizontal: 16 }} />
+
+            {/* Biometric */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#d1fae5', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                <Ionicons name="finger-print" size={18} color="#10b981" />
+              </View>
+              <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '600' }}>Biometric Unlock</Text>
+              <Switch value={isBiometricEnabled} onValueChange={handleBiometricToggle} trackColor={{ false: '#D1D1D6', true: '#34C759' }} />
+            </View>
+
+            <View style={{ height: 1, backgroundColor: isDark ? Colors.dark.border : '#f1f5f9', marginHorizontal: 16 }} />
+
+            {/* Privacy */}
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }} activeOpacity={0.7}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : '#fee2e2', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                <Ionicons name="shield-checkmark" size={18} color="#ef4444" />
+              </View>
+              <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '600' }}>Privacy & Security</Text>
+              <Ionicons name="chevron-forward" size={18} color={C.textMuted} />
+            </TouchableOpacity>
           </View>
-          <View className="h-3 bg-gray-100 rounded-full overflow-hidden">
-            <View 
-              className="h-full bg-primary rounded-full" 
-              style={{ width: `${xpProgress}%` }} 
-            />
-          </View>
-          <Text className="text-[10px] font-bold text-text-muted uppercase text-center mt-3 tracking-widest">
-            {xpToNextLevel - xp} XP TO LEVEL {level + 1}
+        </View>
+
+        {/* Sentry test */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+          <TouchableOpacity
+            style={{
+              height: 52, borderRadius: 18,
+              backgroundColor: isDark ? 'rgba(99,102,241,0.1)' : '#eef2ff',
+              borderWidth: 1, borderColor: isDark ? 'rgba(99,102,241,0.25)' : '#c7d2fe',
+              alignItems: 'center', justifyContent: 'center',
+            }}
+            onPress={() => {
+              Sentry.captureException(new Error('Sentry Test Error from Edurise LMS'));
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ color: Colors.primary, fontSize: 14, fontWeight: '700' }}>Try Sentry Error</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Sign Out */}
+        <View style={{ paddingHorizontal: 20 }}>
+          <TouchableOpacity
+            style={{
+              height: 56, borderRadius: 18,
+              backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#fff5f5',
+              borderWidth: 1, borderColor: isDark ? 'rgba(239,68,68,0.2)' : '#fecaca',
+              alignItems: 'center', justifyContent: 'center', flexDirection: 'row',
+            }}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#ef4444" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#ef4444', fontSize: 15, fontWeight: '700' }}>Sign Out</Text>
+          </TouchableOpacity>
+          <Text style={{ color: C.textMuted, fontSize: 11, textAlign: 'center', marginTop: 16, opacity: 0.5, fontWeight: '500' }}>
+            App Version 2.1.0
           </Text>
         </View>
-      </View>
-
-      {/* Badges / Achievements */}
-      <View className="px-5 mb-8">
-        <Text className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3 ml-1">Achievements</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-          {[
-            { id: 'early-bird', icon: 'sunny', color: '#F59E0B', title: 'Early Bird' },
-            { id: 'fast-learner', icon: 'rocket', color: '#8B5CF6', title: 'Fast Learner' },
-            { id: 'quiz-master', icon: 'trophy', color: '#10B981', title: 'Quiz Master' },
-            { id: 'streak-king', icon: 'flame', color: '#EF4444', title: 'Streak King' },
-          ].map((badge) => (
-            <View key={badge.id} className="items-center bg-white p-4 rounded-3xl border border-border/40 w-24">
-              <View className="w-12 h-12 rounded-full items-center justify-center mb-2" style={{ backgroundColor: `${badge.color}15` }}>
-                <Ionicons name={badge.icon as any} size={24} color={badge.color} />
-              </View>
-              <Text className="text-[10px] font-bold text-text text-center">{badge.title}</Text>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Bento Stats */}
-      <View className="flex-row px-5 space-x-3 mb-8">
-        <View className="flex-1 bg-white rounded-3xl p-4 items-center shadow-sm border border-border/50">
-          <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mb-2">
-            <Ionicons name="layers" size={20} color={Colors.primary} />
-          </View>
-          <Text className="text-xl font-bold text-text">{enrolledCourses.length}</Text>
-          <Text className="text-[10px] font-bold text-text-muted uppercase mt-1">Courses</Text>
-        </View>
-
-        <View className="flex-1 bg-white rounded-3xl p-4 items-center shadow-sm border border-border/50">
-          <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center mb-2">
-            <Ionicons name="heart" size={20} color="#FF9500" />
-          </View>
-          <Text className="text-xl font-bold text-text">{bookmarks.length}</Text>
-          <Text className="text-[10px] font-bold text-text-muted uppercase mt-1">Saved</Text>
-        </View>
-
-        <View className="flex-1 bg-white rounded-3xl p-4 items-center shadow-sm border border-border/50">
-          <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mb-2">
-            <Ionicons name="checkmark-done" size={20} color="#16A34A" />
-          </View>
-          <Text className="text-xl font-bold text-text">{completionProgress}%</Text>
-          <Text className="text-[10px] font-bold text-text-muted uppercase mt-1">Progress</Text>
-        </View>
-      </View>
-
-      {/* Learning Journey Timeline */}
-      <View className="px-5 mb-8">
-        <Text className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3 ml-1">Learning Journey</Text>
-        <View className="bg-white rounded-3xl p-5 shadow-sm border border-border/50">
-          {(timeline.length > 0 ? timeline : [{ id: 'join-event', action: 'Joined Edurise LMS', type: 'join' as const, timestamp: Date.now() }]).map((item, index, arr) => (
-            <View key={item.id || index} className="flex-row">
-              <View className="items-center mr-4">
-                <View className={`w-8 h-8 rounded-full items-center justify-center z-10 
-                  ${item.type === 'complete' ? 'bg-emerald-100' : 
-                    item.type === 'enroll' ? 'bg-blue-100' : 
-                    item.type === 'quiz' ? 'bg-orange-100' : 
-                    item.type === 'bookmark' ? 'bg-indigo-100' : 'bg-primary-lighter'}`}>
-                  <Ionicons 
-                    name={
-                      item.type === 'complete' ? 'checkmark-circle' : 
-                      item.type === 'enroll' ? 'book' : 
-                      item.type === 'quiz' ? 'trophy' : 
-                      item.type === 'bookmark' ? 'bookmark' : 'person-add'
-                    } 
-                    size={16} 
-                    color={
-                      item.type === 'complete' ? '#10B981' : 
-                      item.type === 'enroll' ? '#3B82F6' : 
-                      item.type === 'quiz' ? '#F59E0B' : 
-                      item.type === 'bookmark' ? '#6366F1' : Colors.primary
-                    } 
-                  />
-                </View>
-                {index !== arr.length - 1 && (
-                  <View className="w-0.5 flex-1 bg-border -my-1" />
-                )}
-              </View>
-              <View className="flex-1 pb-6 pt-1">
-                <Text className="text-sm font-bold text-text mb-1">{item.action}</Text>
-                <Text className="text-xs text-text-muted">
-                  {new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Settings Group */}
-      <View className="px-5">
-        <Text className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3 ml-1">Preferences</Text>
-        <View className="bg-white rounded-3xl px-4 shadow-sm border border-border/50">
-          <View className="flex-row items-center justify-between py-4">
-            <View className="flex-row items-center">
-              <View className="w-8 h-8 rounded-lg bg-gray-100 items-center justify-center mr-3">
-                <Ionicons name="moon" size={18} color="#555" />
-              </View>
-              <Text className="text-base font-semibold text-text">Dark Mode</Text>
-            </View>
-            <Switch
-              value={colorScheme === 'dark'}
-              onValueChange={handleThemeToggle}
-              trackColor={{ false: '#D1D1D6', true: Colors.primary }}
-            />
-          </View>
-
-          <View className="h-[1px] bg-background" />
-
-          <TouchableOpacity className="flex-row items-center justify-between py-4">
-            <View className="flex-row items-center">
-              <View className="w-8 h-8 rounded-lg bg-gray-100 items-center justify-center mr-3">
-                <Ionicons name="notifications" size={18} color="#555" />
-              </View>
-              <Text className="text-base font-semibold text-text">Notifications</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-          </TouchableOpacity>
-
-          <View className="h-[1px] bg-background" />
-
-          <View className="flex-row items-center justify-between py-4">
-            <View className="flex-row items-center">
-              <View className="w-8 h-8 rounded-lg bg-gray-100 items-center justify-center mr-3">
-                <Ionicons name="lock-closed" size={18} color="#555" />
-              </View>
-              <Text className="text-base font-semibold text-text">Biometric Unlock</Text>
-            </View>
-            <Switch
-              value={isBiometricEnabled}
-              onValueChange={handleBiometricToggle}
-              trackColor={{ false: '#D1D1D6', true: '#34C759' }}
-            />
-          </View>
-        </View>
-      </View>
-
-      {/* Logout */}
-      <View className="mt-10 px-5 pb-12 items-center">
-        <TouchableOpacity
-          className="w-full h-14 rounded-2xl bg-white border border-red-50 justify-center items-center"
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <Text className="text-error text-base font-bold">Sign Out</Text>
-        </TouchableOpacity>
-        <Text className="mt-4 text-text-muted text-[11px] font-medium opacity-50">App Version 2.1.0</Text>
-      </View>
-    </ScrollView>
-  </View>
+      </ScrollView>
+    </View>
   );
 }
-

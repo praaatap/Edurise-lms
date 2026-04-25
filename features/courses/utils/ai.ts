@@ -1,19 +1,21 @@
-import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 import { Course } from '@/shared/types';
 
-// In a real app, this would be an environment variable
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+// Use Groq for recommendations
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY || 'mock-key',
+const groq = new Groq({
+  apiKey: GROQ_API_KEY || 'gsk_placeholder_replace_me',
   dangerouslyAllowBrowser: true // Necessary for client-side demo
 });
 
 export const aiService = {
   getRecommendedCourses: async (allCourses: Course[], userInterests: string[]): Promise<Course[]> => {
-    if (!OPENAI_API_KEY) {
+    const isPlaceholder = !GROQ_API_KEY || GROQ_API_KEY === 'gsk_placeholder_replace_me';
+
+    if (isPlaceholder) {
       // Mocked logic for demo purposes if no API key
-      console.log('OpenAI API key missing. Using mock recommendation logic.');
+
       return allCourses
         .filter(c => userInterests.some(interest => 
           c.category.toLowerCase().includes(interest.toLowerCase()) ||
@@ -23,12 +25,13 @@ export const aiService = {
     }
 
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+      const response = await groq.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
-            content: "You are a learning assistant. Based on the user's interests, recommend the best courses from the provided list. Return ONLY a JSON array of course IDs."
+            content: "You are a learning assistant. Based on the user's interests, recommend the best courses from the provided list. Return a JSON object with a key 'recommendedIds' containing an array of course IDs."
           },
           {
             role: "user",
@@ -40,7 +43,8 @@ export const aiService = {
       const content = response.choices[0].message.content;
       if (!content) return [];
       
-      const recommendedIds = JSON.parse(content) as string[];
+      const parsed = JSON.parse(content);
+      const recommendedIds = parsed.recommendedIds || [];
       return allCourses.filter(c => recommendedIds.includes(c.id));
     } catch (error) {
       console.error('AI Recommendation Error:', error);

@@ -16,6 +16,8 @@ interface AuthState {
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   updateProfile: (data: Partial<User>) => void;
+  setLocalAvatar: (uri: string) => void;
+  localAvatar: string | null;
 }
 
 const ACCESS_TOKEN_KEY = "userToken";
@@ -28,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      localAvatar: null,
 
       login: async (credentials) => {
         set({ isLoading: true });
@@ -81,41 +84,51 @@ export const useAuthStore = create<AuthState>()(
         try {
           const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
           if (token) {
-            set({ token, isAuthenticated: true, isLoading: false });
-            return;
-          } else {
-            const refreshToken =
-              await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-            if (refreshToken) {
-              try {
-                const refreshRes = await authApi.refreshToken(refreshToken);
-                const nextAccessToken = refreshRes.data.accessToken;
-                const nextRefreshToken =
-                  refreshRes.data.refreshToken ?? refreshToken;
-
-                await SecureStore.setItemAsync(
-                  ACCESS_TOKEN_KEY,
-                  nextAccessToken,
-                );
-                await SecureStore.setItemAsync(
-                  REFRESH_TOKEN_KEY,
-                  nextRefreshToken,
-                );
-
-                set({
-                  token: nextAccessToken,
-                  isAuthenticated: true,
-                  isLoading: false,
-                });
-                return;
-              } catch {
-                await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+            // Token exists — validate it and fetch a fresh user profile
+            try {
+              const userRes = await authApi.getCurrentUser();
+              set({ token, user: userRes.data, isAuthenticated: true, isLoading: false });
+            } catch {
+              // Token may be expired — try refresh flow
+              const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+              if (refreshToken) {
+                try {
+                  const refreshRes = await authApi.refreshToken(refreshToken);
+                  const nextAccessToken = refreshRes.data.accessToken;
+                  const nextRefreshToken = refreshRes.data.refreshToken ?? refreshToken;
+                  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, nextAccessToken);
+                  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, nextRefreshToken);
+                  const userRes = await authApi.getCurrentUser();
+                  set({ token: nextAccessToken, user: userRes.data, isAuthenticated: true, isLoading: false });
+                  return;
+                } catch {
+                  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+                  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+                }
               }
+              set({ token: null, user: null, isAuthenticated: false, isLoading: false });
             }
-
-            set({ token: null, isAuthenticated: false, isLoading: false });
+            return;
           }
-        } catch (error) {
+
+          const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+          if (refreshToken) {
+            try {
+              const refreshRes = await authApi.refreshToken(refreshToken);
+              const nextAccessToken = refreshRes.data.accessToken;
+              const nextRefreshToken = refreshRes.data.refreshToken ?? refreshToken;
+              await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, nextAccessToken);
+              await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, nextRefreshToken);
+              const userRes = await authApi.getCurrentUser();
+              set({ token: nextAccessToken, user: userRes.data, isAuthenticated: true, isLoading: false });
+              return;
+            } catch {
+              await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+            }
+          }
+
+          set({ token: null, isAuthenticated: false, isLoading: false });
+        } catch {
           set({ token: null, isAuthenticated: false, isLoading: false });
         }
       },
@@ -125,11 +138,13 @@ export const useAuthStore = create<AuthState>()(
           user: state.user ? { ...state.user, ...data } : null,
         }));
       },
+
+      setLocalAvatar: (uri: string) => set({ localAvatar: uri }),
     }),
     {
       name: "auth-storage",
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ user: state.user }), // Only persist user info, token is in SecureStore
+      partialize: (state) => ({ user: state.user, localAvatar: state.localAvatar }), // Persist localAvatar safely
     },
   ),
 );

@@ -16,12 +16,12 @@ export const Colors = {
   bookmark: '#FB923C',     // Use accent for bookmark/favs
   enrolled: '#22C55E',
   dark: {
-    background: '#0F172A',
-    surface: '#1E293B',
-    surfaceElevated: '#334155',
-    text: '#F8FAFC',
-    textMuted: '#94A3B8',
-    border: '#334155',
+    background: '#000000',
+    surface: '#121212',
+    surfaceElevated: '#1E1E1E',
+    text: '#FFFFFF',
+    textMuted: '#9CA3AF',
+    border: '#262626',
   }
 };
 

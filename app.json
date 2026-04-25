@@ -37,12 +37,18 @@
       ],
       "expo-secure-store",
       "expo-notifications",
-      "@sentry/react-native",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your AI Tutor.",
+          "cameraPermission": "The app accesses your camera to let you take photos and share them with your AI Tutor."
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/",
-          "project": "edurise-lms",
+          "project": "react-native",
           "organization": "praaatap"
         }
       ]
@@ -53,6 +59,8 @@
     },
     "extra": {
       "router": {},
+
+      
       "eas": {
         "projectId": "e3b1f6c9-3e0c-4160-8879-5bc2394ca0fa"
       }

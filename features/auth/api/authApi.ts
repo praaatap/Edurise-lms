@@ -20,6 +20,12 @@ export interface RefreshTokenResponse {
   success: boolean;
 }
 
+export interface CurrentUserResponse {
+  data: User;
+  message: string;
+  success: boolean;
+}
+
 export interface LoginPayload {
   email: string;
   password: string;
@@ -58,4 +64,12 @@ export const authApi = {
     );
     return response.data;
   },
+
+  getCurrentUser: async () => {
+    const response = await apiClient.get<CurrentUserResponse>(
+      "/api/v1/users/current-user",
+    );
+    return response.data;
+  },
 };
+

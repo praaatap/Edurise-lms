@@ -1,3 +1,5 @@
+import 'react-native-url-polyfill/auto';
+import 'text-encoding';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,20 +23,27 @@ import {
   useColorScheme as useNativeColorScheme,
   View,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 
 import { Colors } from '@/core/theme/colors';
+import * as Linking from 'expo-linking';
 import { OfflineBanner } from '@/shared/components/ui/OfflineBanner';
-import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
+import { OfflineScreen } from '@/shared/components/ui/OfflineScreen';
+import { useNetworkStatus } from '@/shared/utils/network';
+import { ErrorBoundary } from '@/shared/components/ui/ErrorBoundary';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useThemeStore } from '@/core/theme/themeStore';
 import { requestPermissions, scheduleReminderNotification } from '@/features/notifications/services/notificationService';
 import { analytics } from '@/core/services/analyticsService';
-// Initialize Sentry
-Sentry.init({
-  dsn: "https://examplePublicKey@o0.ingest.sentry.io/0", 
-  debug: false,
-  enableNative: true,
-});
+// Initialize Sentry — only when a real DSN is provided via environment variable
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    debug: false,
+    enableNative: true,
+  });
+}
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -52,6 +61,8 @@ function RootLayoutContent() {
   const [isReady, setIsReady] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSplashAnimationComplete, setIsSplashAnimationComplete] = useState(false);
+  const { isConnected } = useNetworkStatus();
+  const [showOfflineScreen, setShowOfflineScreen] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{
     visible: boolean;
     title: string;
@@ -61,11 +72,16 @@ function RootLayoutContent() {
 
   const theme = storedTheme === 'system' ? nativeColorScheme : storedTheme;
   const isDark = theme === 'dark';
+  const bgColor = isDark ? Colors.dark.background : Colors.background;
 
   useEffect(() => {
     const init = async () => {
-      // 0. Analytics init
+      // 0. Analytics & Linking init
       await analytics.init();
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) {
+
+      }
 
       // 1. Auth check
       await checkAuth();
@@ -99,6 +115,13 @@ function RootLayoutContent() {
       }
 
       setIsReady(true);
+      
+      // Check initial network state
+      const state = await NetInfo.fetch();
+      if (!state.isConnected) {
+        setShowOfflineScreen(true);
+      }
+
       // Hide native splash screen once app is ready to show custom animation
       await SplashScreen.hideAsync();
     };
@@ -139,7 +162,8 @@ function RootLayoutContent() {
 
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <CustomDialog
+      <View style={{ flex: 1, backgroundColor: bgColor }}>
+        <CustomDialog
         visible={dialogConfig.visible}
         title={dialogConfig.title}
         message={dialogConfig.message}
@@ -149,7 +173,16 @@ function RootLayoutContent() {
         }}
         onCancel={() => setDialogConfig(prev => ({ ...prev, visible: false }))}
       />
-      <OfflineBanner />
+      {!isConnected && showOfflineScreen ? (
+        <OfflineScreen 
+          onRetry={() => {
+            // Network status updates automatically via NetInfo
+          }} 
+          onContinueOffline={() => setShowOfflineScreen(false)} 
+        />
+      ) : (
+        <OfflineBanner />
+      )}
       <Stack screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: isDark ? Colors.dark.background : Colors.background }
@@ -160,6 +193,7 @@ function RootLayoutContent() {
         <Stack.Screen name="course/[id]/content" />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      </View>
     </ThemeProvider>
   );
 }
@@ -167,14 +201,13 @@ function RootLayoutContent() {
 
 export default Sentry.wrap(function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#f1f5f9' }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <View 
         style={{ 
           flex: 1, 
           maxWidth: Platform.OS === 'web' ? 480 : undefined, 
           width: '100%', 
           alignSelf: 'center', 
-          backgroundColor: '#fff',
           overflow: 'hidden',
           ...(Platform.OS === 'web' ? {
             boxShadow: '0 0 20px rgba(0,0,0,0.05)',

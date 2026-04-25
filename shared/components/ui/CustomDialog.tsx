@@ -1,4 +1,3 @@
-
 import {
   Modal,
   Text,
@@ -8,6 +7,7 @@ import {
 } from 'react-native';
 
 import Animated, { ZoomIn } from 'react-native-reanimated';
+import { useTheme } from '@/core/theme/useTheme';
 
 interface CustomDialogProps {
   visible: boolean;
@@ -30,6 +30,8 @@ export function CustomDialog({
   cancelText = 'Cancel',
   type = 'default',
 }: CustomDialogProps) {
+  const { C } = useTheme();
+
   if (!visible) return null;
 
   const isDestructive = type === 'destructive';
@@ -43,11 +45,11 @@ export function CustomDialog({
       onRequestClose={onCancel}
     >
       <TouchableWithoutFeedback onPress={onCancel}>
-        <View className="flex-1 bg-black/50 justify-center items-center px-8">
+        <View className="flex-1 bg-black/60 justify-center items-center px-8">
           <TouchableWithoutFeedback>
-            <Animated.View 
+            <Animated.View
               entering={ZoomIn.duration(250)}
-              className="bg-white dark:bg-dark-surface w-full rounded-[28px] p-6 shadow-2xl"
+              style={{ backgroundColor: C.surface, width: '100%', borderRadius: 28, padding: 24 }}
             >
               <Text className="text-xl font-bold text-text dark:text-dark-text mb-3">
                 {title}
@@ -56,7 +58,7 @@ export function CustomDialog({
                 {message}
               </Text>
 
-              <View className="flex-row justify-end space-x-3">
+              <View className="flex-row justify-end space-x-3" style={{ gap: 12 }}>
                 {onCancel && (
                   <TouchableOpacity
                     onPress={onCancel}

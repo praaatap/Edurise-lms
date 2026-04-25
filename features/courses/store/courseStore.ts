@@ -99,7 +99,7 @@ export const useCourseStore = create<CourseState>()(
         const { timeline } = get();
         const newEvent: TimelineEvent = {
           ...event,
-          id: Math.random().toString(36).substring(2, 11),
+          id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
           timestamp: Date.now(),
         };
         // Keep the latest 20 events
@@ -258,6 +258,8 @@ export const useCourseStore = create<CourseState>()(
             type: 'complete',
           });
         }
+        // Use a generic event name or add 'course_complete' to type
+        analytics.logEvent('quiz_complete', { courseId, type: 'course_finished' });
       },
 
       updateQuizScore: (courseId: string, score: number) => {
@@ -282,6 +284,7 @@ export const useCourseStore = create<CourseState>()(
             });
           }
         }
+        analytics.logEvent('quiz_complete', { courseId, score });
       },
 
       addNote: (courseId, note) => {
@@ -331,7 +334,6 @@ export const useCourseStore = create<CourseState>()(
       name: "course-storage",
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        courses: state.courses,
         bookmarks: state.bookmarks,
         enrolledCourses: state.enrolledCourses,
         completedCourses: state.completedCourses,

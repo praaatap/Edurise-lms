@@ -1,7 +1,15 @@
 import { Colors } from '@/core/theme/colors';
 import { Course } from '@/shared/types';
 
-export const generateCourseHtml = (course: Course) => {
+export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
+  const bg = isDark ? '#0F172A' : '#f8fafc';
+  const surface = isDark ? '#1E293B' : '#ffffff';
+  const text = isDark ? '#F8FAFC' : Colors.text;
+  const textMuted = isDark ? '#94A3B8' : Colors.textMuted;
+  const border = isDark ? '#334155' : '#f1f5f9';
+  const cardTitle = isDark ? '#F8FAFC' : '#0f172a';
+  const primaryLight = isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5';
+
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -11,14 +19,15 @@ export const generateCourseHtml = (course: Course) => {
         <style>
           :root {
             --primary: ${Colors.primary};
-            --primary-light: #ecfdf5;
-            --text: ${Colors.text};
-            --text-muted: ${Colors.textMuted};
-            --background: #f8fafc;
-            --surface: #ffffff;
-            --border: #f1f5f9;
+            --primary-light: ${primaryLight};
+            --text: ${text};
+            --text-muted: ${textMuted};
+            --background: ${bg};
+            --surface: ${surface};
+            --border: ${border};
             --success: #10b981;
             --error: #ef4444;
+            --card-title: ${cardTitle};
           }
           
           body {
@@ -91,7 +100,7 @@ export const generateCourseHtml = (course: Course) => {
           h1 { 
             font-size: 28px; 
             margin: 0 0 12px 0; 
-            color: #0f172a; 
+            color: var(--card-title); 
             letter-spacing: -0.8px;
             line-height: 1.2;
             font-weight: 800;
@@ -109,6 +118,7 @@ export const generateCourseHtml = (course: Course) => {
             border-radius: 50%;
             background: #e2e8f0;
             margin-right: 10px;
+            object-fit: cover;
           }
 
           .card {
@@ -124,7 +134,7 @@ export const generateCourseHtml = (course: Course) => {
             font-size: 18px;
             font-weight: 800;
             margin: 0 0 20px 0;
-            color: #0f172a;
+            color: var(--card-title);
           }
 
           /* Code Snippet */
@@ -159,9 +169,10 @@ export const generateCourseHtml = (course: Course) => {
             display: flex;
             align-items: center;
             padding: 16px;
-            background: #f8fafc;
+            background: var(--background);
             border-radius: 16px;
             margin-bottom: 12px;
+            border: 1px solid transparent;
           }
           .lesson-item.active {
             background: var(--primary-light);
@@ -170,7 +181,7 @@ export const generateCourseHtml = (course: Course) => {
           .lesson-icon {
             width: 40px;
             height: 40px;
-            background: white;
+            background: var(--surface);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -180,35 +191,35 @@ export const generateCourseHtml = (course: Course) => {
             font-weight: bold;
             color: var(--primary);
           }
-          .lesson-title { font-weight: 700; color: #0f172a; font-size: 15px; }
+          .lesson-title { font-weight: 700; color: var(--card-title); font-size: 15px; }
           .lesson-duration { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 600;}
 
           /* Quiz Node */
           .quiz-node {
-            background: #f8fafc;
+            background: var(--background);
             border-radius: 20px;
             padding: 20px;
             margin-bottom: 24px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border);
           }
           .question-text { 
             font-weight: 800; 
             font-size: 17px; 
             margin-bottom: 16px; 
             display: block; 
-            color: #0f172a;
+            color: var(--card-title);
           }
           .option-label {
             display: flex;
             align-items: center;
             padding: 16px;
-            background: white;
+            background: var(--surface);
             border: 2px solid transparent;
             border-radius: 16px;
             margin-bottom: 10px;
             font-size: 15px;
             font-weight: 600;
-            color: #475569;
+            color: var(--text);
             box-shadow: 0 2px 6px rgba(0,0,0,0.02);
             transition: all 0.2s;
           }
@@ -217,7 +228,7 @@ export const generateCourseHtml = (course: Course) => {
             width: 20px;
             height: 20px;
             border-radius: 50%;
-            border: 2px solid #cbd5e1;
+            border: 2px solid var(--text-muted);
             margin-right: 14px;
             position: relative;
           }
@@ -269,12 +280,12 @@ export const generateCourseHtml = (course: Course) => {
             from { transform: translateY(-10px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
           }
-          .feedback.correct { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
-          .feedback.incorrect { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+          .feedback.correct { background: var(--primary-light); color: var(--primary); border: 1px solid rgba(16,185,129,0.3); }
+          .feedback.incorrect { background: rgba(239,68,68,0.1); color: var(--error); border: 1px solid rgba(239,68,68,0.3); }
         </style>
       </head>
       <body>
-        <div class="video-container">
+        <div class="video-container" style="background-image: url('${course.thumbnail}'); background-size: cover; background-position: center;">
           <div class="play-btn"><div class="play-btn-triangle"></div></div>
           <div style="position: absolute; bottom: 16px; left: 20px; z-index: 10;">
             <span style="background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: bold; backdrop-filter: blur(4px);">Preview</span>
@@ -286,14 +297,14 @@ export const generateCourseHtml = (course: Course) => {
             <div class="badge">${course.category}</div>
             <h1>${course.title}</h1>
             <div class="instructor">
-              <div class="instructor-avatar"></div>
+              <img src="${course.instructor.avatar}" class="instructor-avatar" />
               ${course.instructor.name}
             </div>
           </div>
 
           <div class="card">
             <h3>Overview</h3>
-            <p style="color: #475569; font-size: 15px; margin: 0;">${course.description}</p>
+            <p style="color: var(--text); font-size: 15px; margin: 0;">${course.description}</p>
             
             <div class="code-block">
 <pre><span class="token keyword">import</span> { useState } <span class="token keyword">from</span> <span class="token string">'react'</span>;

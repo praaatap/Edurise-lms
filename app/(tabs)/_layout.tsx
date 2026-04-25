@@ -1,15 +1,20 @@
 import { Colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme/useTheme';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { Tabs } from 'expo-router';
 import { Heart, LayoutGrid, House, User } from 'lucide-react-native';
 import { Platform, View } from 'react-native';
+import { Image } from 'expo-image';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { FloatingAIBtn } from '@/shared/components/ui/FloatingAIBtn';
 import { NetworkStatus } from '@/shared/components/ui/NetworkStatus';
 
 export default function TabLayout() {
+  const { user, localAvatar } = useAuthStore();
   const bookmarks = useCourseStore((s) => s.bookmarks);
   const bookmarkCount = bookmarks.length;
+  const { C, isDark } = useTheme();
 
   return (
     <SafeAreaProvider>
@@ -18,24 +23,25 @@ export default function TabLayout() {
         <Tabs
           screenOptions={{
             tabBarActiveTintColor: Colors.primary,
-            tabBarInactiveTintColor: Colors.textMuted,
+            tabBarInactiveTintColor: isDark ? '#6B7280' : Colors.textMuted,
             headerShown: false,
             tabBarStyle: {
-              backgroundColor: Colors.surface,
+              backgroundColor: C.surface,
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
-              borderTopWidth: 0,
+              borderTopWidth: isDark ? 1 : 0,
+              borderTopColor: isDark ? C.border : 'transparent',
               height: Platform.OS === 'ios' ? 120 : 100,
               paddingBottom: Platform.OS === 'ios' ? 24 : 10,
               paddingTop: 8,
-              elevation: 20, 
+              elevation: isDark ? 0 : 20,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: 0.08,
+              shadowOpacity: isDark ? 0 : 0.08,
               shadowRadius: 16,
             },
             tabBarLabelStyle: {
@@ -89,9 +95,28 @@ export default function TabLayout() {
             options={{
               title: 'Profile',
               tabBarLabel: 'Profile',
-              tabBarIcon: ({ color, focused }) => (
-                <User size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
-              ),
+              tabBarIcon: ({ color, focused }) => {
+                const avatarUrl = localAvatar || user?.avatar;
+                if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim() !== '') {
+                  return (
+                    <View 
+                      className="rounded-full overflow-hidden border-2" 
+                      style={{ 
+                        borderColor: focused ? Colors.primary : 'transparent',
+                        width: 26,
+                        height: 26
+                      }}
+                    >
+                      <Image 
+                        source={{ uri: avatarUrl }} 
+                        className="w-full h-full"
+                        contentFit="cover"
+                      />
+                    </View>
+                  );
+                }
+                return <User size={22} color={color} strokeWidth={focused ? 2.5 : 2} />;
+              },
             }}
           />
         </Tabs>
