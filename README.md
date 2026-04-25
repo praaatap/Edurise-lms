@@ -44,6 +44,7 @@ Edurise is a high-performance, senior-level Mini LMS application designed to exc
 *   **4.1 Local Notifications**: Schedules smart notifications for milestones (e.g., 5th bookmark) and 24-hour re-engagement reminders.
 *   **4.2 Camera & Gallery**: Deep integration with `Expo ImagePicker` for seamless profile picture updates.
 *   **4.3 Network Monitoring**: Real-time connectivity tracking using `@react-native-community/netinfo` with offline banners and fallback screens.
+*   **4.4 EAS Updates**: Support for over-the-air (OTA) updates using `expo-updates` with a custom prompt-to-update UI.
 
 ---
 
@@ -70,7 +71,8 @@ We use **Zustand** for its lightweight footprint and high performance.
 *   **Security**: Authentication state is stored in `SecureStore` to prevent token leakage.
 
 ### 3. AI-First User Experience
-The app integrates **Llama 3.3** not just as a gimmick, but as a core navigation and discovery tool. The AI can "route" the user to specific course pages based on their chat context.
+*   **AI-Powered Discovery**: The app integrates **Llama 3.3** not just as a gimmick, but as a core navigation and discovery tool. The AI can "route" the user to specific course pages based on their chat context.
+*   **Over-the-Air Updates (OTA)**: Implemented **EAS Updates** to deliver bug fixes and feature enhancements instantly without requiring a full app store submission cycle.
 
 ---
 

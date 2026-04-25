@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>2/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -94,55 +94,55 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState, useEffect } from 'react';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >useNetworkStatus(</span>) {
-  const [isConnected, setIsConnected] = <span class="cstat-no" title="statement not covered" >useState&lt;boolean&gt;(true);</span>
-  const [connectionType, setConnectionType] = <span class="cstat-no" title="statement not covered" >useState&lt;string&gt;('unknown');</span>
+export function useNetworkStatus() {
+  const [isConnected, setIsConnected] = useState&lt;boolean&gt;(true);
+  const [connectionType, setConnectionType] = useState&lt;string&gt;('unknown');
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  useEffect(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+  useEffect(() =&gt; {
     // Initial fetch
-<span class="cstat-no" title="statement not covered" >    NetInfo.fetch().then(<span class="fstat-no" title="function not covered" >(s</span>tate: NetInfoState) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      setIsConnected(state.isConnected ?? true);</span>
-<span class="cstat-no" title="statement not covered" >      setConnectionType(state.type);</span>
+    NetInfo.fetch().then((state: NetInfoState) =&gt; {
+      setIsConnected(state.isConnected ?? <span class="branch-1 cbranch-no" title="branch not covered" >true)</span>;
+      setConnectionType(state.type);
     });
 &nbsp;
     // Subscribe for updates
-    const unsubscribe = <span class="cstat-no" title="statement not covered" >NetInfo.addEventListener(<span class="fstat-no" title="function not covered" >(s</span>tate: NetInfoState) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      setIsConnected(state.isConnected ?? true);</span>
-<span class="cstat-no" title="statement not covered" >      setConnectionType(state.type);</span>
+    const unsubscribe = NetInfo.addEventListener((state: NetInfoState) =&gt; {
+      setIsConnected(state.isConnected ?? <span class="branch-1 cbranch-no" title="branch not covered" >true)</span>;
+      setConnectionType(state.type);
     });
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      unsubscribe();</span>
+    return () =&gt; {
+      unsubscribe();
     };
   }, []);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return { isConnected, connectionType };</span>
+  return { isConnected, connectionType };
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -151,7 +151,7 @@ export function <span class="fstat-no" title="function not covered" >useNetworkS
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-25T19:35:20.028Z
+                at 2026-04-25T20:38:06.947Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

@@ -1,21 +1,18 @@
 import Groq from 'groq-sdk';
 import { Course } from '@/shared/types';
 
-// Use Groq for recommendations
-const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-
-const groq = new Groq({
-  apiKey: GROQ_API_KEY || 'gsk_placeholder_replace_me',
+const getGroqClient = () => new Groq({
+  apiKey: process.env.EXPO_PUBLIC_GROQ_API_KEY || 'gsk_placeholder_replace_me',
   dangerouslyAllowBrowser: true // Necessary for client-side demo
 });
 
 export const aiService = {
   getRecommendedCourses: async (allCourses: Course[], userInterests: string[]): Promise<Course[]> => {
-    const isPlaceholder = !GROQ_API_KEY || GROQ_API_KEY === 'gsk_placeholder_replace_me';
+    const apiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+    const isPlaceholder = !apiKey || apiKey === 'gsk_placeholder_replace_me';
 
     if (isPlaceholder) {
       // Mocked logic for demo purposes if no API key
-
       return allCourses
         .filter(c => userInterests.some(interest => 
           c.category.toLowerCase().includes(interest.toLowerCase()) ||
@@ -25,6 +22,7 @@ export const aiService = {
     }
 
     try {
+      const groq = getGroqClient();
       const response = await groq.chat.completions.create({
         model: "llama-3.1-8b-instant",
         response_format: { type: "json_object" },

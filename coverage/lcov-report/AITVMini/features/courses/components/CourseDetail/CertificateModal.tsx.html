@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>0/2</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
@@ -140,8 +140,22 @@
 <a name='L75'></a><a href='#L75'>75</a>
 <a name='L76'></a><a href='#L76'>76</a>
 <a name='L77'></a><a href='#L77'>77</a>
-<a name='L78'></a><a href='#L78'>78</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -157,6 +171,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -217,11 +232,25 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React from 'react';
-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { Trophy, Share2 } from 'lucide-react-native';
-import { Image } from 'expo-image';
 import { Colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme/useTheme';
 import Animated, { FadeIn } from 'react-native-reanimated';
 &nbsp;
 interface CertificateModalProps {
@@ -232,6 +261,8 @@ interface CertificateModalProps {
 }
 &nbsp;
 export const CertificateModal = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >({</span> visible, onClose, onShare, courseTitle }: CertificateModalProps) =&gt; {</span>
+  const { C, isDark } = <span class="cstat-no" title="statement not covered" >useTheme();</span>
+&nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;Modal
       visible={visible}
@@ -240,52 +271,66 @@ export const CertificateModal = <span class="cstat-no" title="statement not cove
       onRequestClose={onClose}
     &gt;
       &lt;View className="flex-1 bg-black/60 items-center justify-center p-6"&gt;
-        &lt;Animated.View 
+        &lt;Animated.View
           entering={FadeIn.duration(400)}
-          className="bg-white w-full rounded-[40px] overflow-hidden shadow-2xl"
+          style={{ backgroundColor: C.surface, width: '100%', borderRadius: 40, overflow: 'hidden' }}
         &gt;
-          {/* Certificate Design */}
-          &lt;View className="p-8 items-center border-[12px] border-indigo-50 m-2 rounded-[32px]"&gt;
-            &lt;View className="w-20 h-20 bg-primary/10 rounded-full items-center justify-center mb-6"&gt;
+          &lt;View
+            style={{
+              padding: 32,
+              alignItems: 'center',
+              borderWidth: 12,
+              borderColor: isDark ? Colors.dark.surfaceElevated : '#EEF2FF',
+              margin: 8,
+              borderRadius: 32,
+            }}
+          &gt;
+            &lt;View style={{ width: 80, height: 80, backgroundColor: `${Colors.primary}1A`, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}&gt;
               &lt;Trophy size={40} color={Colors.primary} /&gt;
             &lt;/View&gt;
-            
-            &lt;Text className="text-[10px] font-black text-primary uppercase tracking-[4px] mb-2"&gt;Certificate of Achievement&lt;/Text&gt;
-            &lt;Text className="text-xs text-text-muted mb-6 uppercase tracking-widest"&gt;This is to certify that&lt;/Text&gt;
-            
-            &lt;Text className="text-3xl font-black text-text text-center mb-2 italic"&gt;Student Name&lt;/Text&gt;
-            &lt;View className="h-0.5 bg-border w-40 mb-6" /&gt;
-            
-            &lt;Text className="text-sm text-text-muted text-center mb-8 px-4"&gt;
+&nbsp;
+            &lt;Text style={{ color: Colors.primary }} className="text-[10px] font-black uppercase tracking-[4px] mb-2"&gt;
+              Certificate of Achievement
+            &lt;/Text&gt;
+            &lt;Text style={{ color: C.textMuted }} className="text-xs mb-6 uppercase tracking-widest"&gt;
+              This is to certify that
+            &lt;/Text&gt;
+&nbsp;
+            &lt;Text style={{ color: C.text }} className="text-3xl font-black text-center mb-2 italic"&gt;
+              Student Name
+            &lt;/Text&gt;
+            &lt;View style={{ height: 1, backgroundColor: C.border, width: 160, marginBottom: 24 }} /&gt;
+&nbsp;
+            &lt;Text style={{ color: C.textMuted }} className="text-sm text-center mb-8 px-4"&gt;
               has successfully completed the professional course
-              &lt;Text className="font-bold text-text"&gt; {courseTitle} &lt;/Text&gt;
+              &lt;Text style={{ color: C.text }} className="font-bold"&gt; {courseTitle} &lt;/Text&gt;
               demonstrating mastery in the required skills and concepts.
             &lt;/Text&gt;
-            
+&nbsp;
             &lt;View className="flex-row justify-between w-full mt-4 px-4"&gt;
               &lt;View className="items-center"&gt;
-                &lt;View className="h-[1px] bg-border w-24 mb-2" /&gt;
-                &lt;Text className="text-[10px] font-bold text-text-muted uppercase"&gt;Instructor&lt;/Text&gt;
+                &lt;View style={{ height: 1, backgroundColor: C.border, width: 96, marginBottom: 8 }} /&gt;
+                &lt;Text style={{ color: C.textMuted }} className="text-[10px] font-bold uppercase"&gt;Instructor&lt;/Text&gt;
               &lt;/View&gt;
               &lt;View className="items-center"&gt;
-                &lt;View className="h-[1px] bg-border w-24 mb-2" /&gt;
-                &lt;Text className="text-[10px] font-bold text-text-muted uppercase"&gt;Date&lt;/Text&gt;
+                &lt;View style={{ height: 1, backgroundColor: C.border, width: 96, marginBottom: 8 }} /&gt;
+                &lt;Text style={{ color: C.textMuted }} className="text-[10px] font-bold uppercase"&gt;Date&lt;/Text&gt;
               &lt;/View&gt;
             &lt;/View&gt;
           &lt;/View&gt;
 &nbsp;
-          &lt;View className="flex-row p-6 bg-gray-50 border-t border-border"&gt;
-            &lt;TouchableOpacity 
-              className="flex-1 bg-white border border-border h-14 rounded-2xl items-center justify-center mr-3"
+          &lt;View style={{ flexDirection: 'row', padding: 24, backgroundColor: C.surfaceElevated, borderTopWidth: 1, borderTopColor: C.border }}&gt;
+            &lt;TouchableOpacity
+              style={{ flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
               onPress={onClose}
             &gt;
-              &lt;Text className="font-bold text-text"&gt;Close&lt;/Text&gt;
+              &lt;Text style={{ color: C.text }} className="font-bold"&gt;Close&lt;/Text&gt;
             &lt;/TouchableOpacity&gt;
-            &lt;TouchableOpacity 
-              className="flex-1 bg-primary h-14 rounded-2xl items-center justify-center flex-row"
+            &lt;TouchableOpacity
+              style={{ flex: 1, backgroundColor: Colors.primary, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}
               onPress={onShare}
             &gt;
-              &lt;Share2 size={20} color="white" className="mr-2" /&gt;
+              &lt;Share2 size={20} color="white" style={{ marginRight: 8 }} /&gt;
               &lt;Text className="font-bold text-white"&gt;Share&lt;/Text&gt;
             &lt;/TouchableOpacity&gt;
           &lt;/View&gt;
@@ -301,7 +346,7 @@ export const CertificateModal = <span class="cstat-no" title="statement not cove
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-25T19:35:20.028Z
+                at 2026-04-25T20:38:06.947Z
             </div>
         <script src="../../../../../prettify.js"></script>
         <script>

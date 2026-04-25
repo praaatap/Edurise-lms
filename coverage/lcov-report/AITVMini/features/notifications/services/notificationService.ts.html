@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">9.09% </span>
+                <span class="strong">25% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/44</span>
+                <span class='fraction'>11/44</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">10.52% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/19</span>
+                <span class='fraction'>2/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">25% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>2/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">9.3% </span>
+                <span class="strong">23.25% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/43</span>
+                <span class='fraction'>10/43</span>
             </div>
         
             
@@ -205,11 +205,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -289,23 +289,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -313,15 +309,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -422,13 +422,13 @@ export async function <span class="fstat-no" title="function not covered" >clear
   }
 }
 &nbsp;
-export async function <span class="fstat-no" title="function not covered" >scheduleCourseReengagementReminder(</span>
+export async function scheduleCourseReengagementReminder(
   courseId: string,
   courseTitle: string,
   delaySeconds = <span class="branch-0 cbranch-no" title="branch not covered" >60 * 60,</span>
 ) {
-  const existing = <span class="cstat-no" title="statement not covered" >await AsyncStorage.getItem(COURSE_REMINDER_NOTIFICATION_KEY);</span>
-<span class="cstat-no" title="statement not covered" >  if (existing) {</span>
+  const existing = await AsyncStorage.getItem(COURSE_REMINDER_NOTIFICATION_KEY);
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (existing) {
 <span class="cstat-no" title="statement not covered" >    try {</span>
       const parsed = <span class="cstat-no" title="statement not covered" >JSON.parse(existing) as { notificationId?: string };</span>
 <span class="cstat-no" title="statement not covered" >      if (parsed.notificationId) {</span>
@@ -439,7 +439,7 @@ export async function <span class="fstat-no" title="function not covered" >sched
     }
   }
 &nbsp;
-  const notificationId = <span class="cstat-no" title="statement not covered" >await Notifications.scheduleNotificationAsync({</span>
+  const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: "Your course is waiting",
       body: `Jump back into ${courseTitle} and keep your momentum going.`,
@@ -451,15 +451,15 @@ export async function <span class="fstat-no" title="function not covered" >sched
     },
   });
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  await AsyncStorage.setItem(</span>
+  await AsyncStorage.setItem(
     COURSE_REMINDER_NOTIFICATION_KEY,
     JSON.stringify({ notificationId, courseId, scheduledAt: Date.now() }),
   );
 }
 &nbsp;
-export async function <span class="fstat-no" title="function not covered" >clearCourseReminderNotification(</span>) {
-  const existing = <span class="cstat-no" title="statement not covered" >await AsyncStorage.getItem(COURSE_REMINDER_NOTIFICATION_KEY);</span>
-<span class="cstat-no" title="statement not covered" >  if (!existing) <span class="cstat-no" title="statement not covered" >return;</span></span>
+export async function clearCourseReminderNotification() {
+  const existing = await AsyncStorage.getItem(COURSE_REMINDER_NOTIFICATION_KEY);
+  <span class="missing-if-branch" title="else path not taken" >E</span>if (!existing) return;
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  try {</span>
     const parsed = <span class="cstat-no" title="statement not covered" >JSON.parse(existing) as { notificationId?: string };</span>
@@ -484,7 +484,7 @@ export async function <span class="fstat-no" title="function not covered" >cance
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-25T19:35:20.028Z
+                at 2026-04-25T20:38:06.947Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

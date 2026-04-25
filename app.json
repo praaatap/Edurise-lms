@@ -8,6 +8,12 @@
     "scheme": "edurise",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/e3b1f6c9-3e0c-4160-8879-5bc2394ca0fa"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": true
     },

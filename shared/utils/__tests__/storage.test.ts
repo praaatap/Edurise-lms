@@ -1,29 +1,32 @@
 // Storage Utils Unit Tests
 // Tests the core storage utility which wraps SecureStore and AsyncStorage
 
-// Module-level mocks must be hoisted before any imports
-const mockSetItemAsync = jest.fn().mockResolvedValue(undefined);
-const mockGetItemAsync = jest.fn().mockResolvedValue(null);
-const mockDeleteItemAsync = jest.fn().mockResolvedValue(undefined);
-
-const mockAsyncSetItem = jest.fn().mockResolvedValue(undefined);
-const mockAsyncGetItem = jest.fn().mockResolvedValue(null);
-const mockAsyncRemoveItem = jest.fn().mockResolvedValue(undefined);
-
 jest.mock('expo-secure-store', () => ({
-  setItemAsync: mockSetItemAsync,
-  getItemAsync: mockGetItemAsync,
-  deleteItemAsync: mockDeleteItemAsync,
+  setItemAsync: jest.fn(),
+  getItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  setItem: mockAsyncSetItem,
-  getItem: mockAsyncGetItem,
-  removeItem: mockAsyncRemoveItem,
+  __esModule: true,
+  default: {
+    setItem: jest.fn(),
+    getItem: jest.fn(),
+    removeItem: jest.fn(),
+  },
 }));
 
-// Import after mocks
+import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storage } from '../storage';
+
+const mockSetItemAsync = SecureStore.setItemAsync as jest.Mock;
+const mockGetItemAsync = SecureStore.getItemAsync as jest.Mock;
+const mockDeleteItemAsync = SecureStore.deleteItemAsync as jest.Mock;
+
+const mockAsyncSetItem = AsyncStorage.setItem as jest.Mock;
+const mockAsyncGetItem = AsyncStorage.getItem as jest.Mock;
+const mockAsyncRemoveItem = AsyncStorage.removeItem as jest.Mock;
 
 describe('Storage Utils', () => {
   beforeEach(() => {

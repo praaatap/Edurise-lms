@@ -1,17 +1,13 @@
 import { aiService } from './ai';
 
 // Mock Groq
+const mockCreate = jest.fn();
+
 jest.mock('groq-sdk', () => {
   return jest.fn().mockImplementation(() => ({
     chat: {
       completions: {
-        create: jest.fn().mockResolvedValue({
-          choices: [{
-            message: {
-              content: '{"recommendedIds": ["1"]}'
-            }
-          }]
-        })
+        create: mockCreate
       }
     }
   }));
@@ -25,6 +21,13 @@ describe('AI Service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCreate.mockResolvedValue({
+      choices: [{
+        message: {
+          content: '{"recommendedIds": ["1"]}'
+        }
+      }]
+    });
   });
 
   it('should return mock recommendations when API key is missing', async () => {
@@ -44,13 +47,12 @@ describe('AI Service', () => {
     const res = await aiService.getRecommendedCourses(mockCourses, ['Web']);
     expect(res).toHaveLength(1);
     expect(res[0].id).toBe('1');
+    expect(mockCreate).toHaveBeenCalled();
   });
 
   it('should fallback to first courses on error', async () => {
     process.env.EXPO_PUBLIC_GROQ_API_KEY = 'valid_key';
-    const Groq = require('groq-sdk');
-    const mockGroq = new Groq();
-    mockGroq.chat.completions.create.mockRejectedValueOnce(new Error('API Error'));
+    mockCreate.mockRejectedValueOnce(new Error('API Error'));
 
     const res = await aiService.getRecommendedCourses(mockCourses, ['Web']);
     expect(res).toHaveLength(2); // Fallback returns slice(0, 3)

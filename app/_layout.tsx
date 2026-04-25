@@ -35,6 +35,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import { useThemeStore } from '@/core/theme/themeStore';
 import { requestPermissions, scheduleReminderNotification } from '@/features/notifications/services/notificationService';
 import { analytics } from '@/core/services/analyticsService';
+import { useUpdates } from '@/shared/hooks/useUpdates';
 // Initialize Sentry — only when a real DSN is provided via environment variable
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 if (SENTRY_DSN) {
@@ -63,6 +64,9 @@ function RootLayoutContent() {
   const [isSplashAnimationComplete, setIsSplashAnimationComplete] = useState(false);
   const { isConnected } = useNetworkStatus();
   const [showOfflineScreen, setShowOfflineScreen] = useState(false);
+  
+  // EAS Updates
+  useUpdates();
   const [dialogConfig, setDialogConfig] = useState<{
     visible: boolean;
     title: string;
