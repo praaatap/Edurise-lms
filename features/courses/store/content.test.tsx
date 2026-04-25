@@ -6,6 +6,16 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 
 // Mock dependencies
+jest.mock('lucide-react-native', () => {
+    const { Text } = require('react-native');
+    return {
+        ArrowLeft: () => <Text>Icon</Text>,
+        Pencil: () => <Text>Icon</Text>,
+        TriangleAlert: () => <Text>Icon</Text>,
+        X: () => <Text>Icon</Text>,
+    };
+});
+
 jest.mock('expo-router', () => ({
     useLocalSearchParams: jest.fn().mockReturnValue({ id: 'test-course-1' }),
     useRouter: jest.fn(),
@@ -92,10 +102,9 @@ describe('CourseContentScreen', () => {
         // We'll mock useState temporarily or simulate an error
         // An easier approach for functional components is forcing the condition
         const useStateSpy = jest.spyOn(React, 'useState');
-        // Mock the state to simulate: [progress, isLoading, webViewError]
+        // Current state order in content.tsx: progress, webViewError, isNoteModalVisible, noteText, dialogConfig
         useStateSpy
             .mockImplementationOnce(() => [0, jest.fn()]) // progress
-            .mockImplementationOnce(() => [false, jest.fn()]) // isLoading
             .mockImplementationOnce(() => ['Connection dropped', jest.fn()]); // webViewError
 
         const { getByText } = render(<CourseContentScreen />);
