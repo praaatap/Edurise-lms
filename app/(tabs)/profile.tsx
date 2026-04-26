@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,8 +54,13 @@ export default function ProfileScreen() {
   const xpToNextLevel = level * 1000;
   const xpProgress = Math.min(100, (xp / xpToNextLevel) * 100);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    AsyncStorage.getItem('biometric_enabled').then(val => setIsBiometricEnabled(val === 'true'));
+    mountedRef.current = true;
+    AsyncStorage.getItem('biometric_enabled').then(val => {
+      if (mountedRef.current) setIsBiometricEnabled(val === 'true');
+    });
+    return () => { mountedRef.current = false; };
   }, []);
 
   const handleThemeToggle = useCallback((isDarkToggle: boolean) => {
@@ -149,7 +154,8 @@ export default function ProfileScreen() {
         onPickFromGallery={() => {
           setIsUnsplashVisible(false);
           // Delay ensures modal is fully dismissed before iOS shows another native controller.
-          setTimeout(() => pickProfileImage(), 500);
+          const t = setTimeout(() => { if (mountedRef.current) pickProfileImage(); }, 500);
+          return () => clearTimeout(t);
         }}
       />
 

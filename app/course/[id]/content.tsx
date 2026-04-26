@@ -202,7 +202,7 @@ export default function CourseContentScreen() {
             );
           }}
           onLoadProgress={({ nativeEvent }) => setProgress(nativeEvent.progress)}
-          originWhitelist={['https://mini-lms.local']}
+          originWhitelist={['*']}
           onShouldStartLoadWithRequest={(request) => {
             // Security: Prevent navigation to external sites inside this content viewer
             return request.url.startsWith('https://mini-lms.local');
