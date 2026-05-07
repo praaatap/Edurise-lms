@@ -33,6 +33,7 @@ import { OfflineScreen } from '@/shared/components/ui/OfflineScreen';
 import { useNetworkStatus } from '@/shared/utils/network';
 import { ErrorBoundary } from '@/shared/components/ui/ErrorBoundary';
 import { useAuthStore } from '@/features/auth/store/authStore';
+import { useSchoolStore } from '@/features/school/store/schoolStore';
 import { useThemeStore } from '@/core/theme/themeStore';
 import { requestPermissions, scheduleReminderNotification } from '@/features/notifications/services/notificationService';
 import { analytics } from '@/core/services/analyticsService';
@@ -73,6 +74,27 @@ function RootLayoutContent() {
   const theme = storedTheme === 'system' ? nativeColorScheme : storedTheme;
   const isDark = theme === 'dark';
   const bgColor = isDark ? Colors.dark.background : Colors.background;
+
+  const { activeSchool } = useSchoolStore();
+
+  // Dynamic Web App Icon & Title Logic
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const iconUrl = activeSchool?.branding?.icon || activeSchool?.logo || '/favicon.ico';
+      const title = activeSchool?.name ? `${activeSchool.name} | Edurise LMS` : 'Edurise LMS';
+
+      document.title = title;
+
+      let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.type = 'image/x-icon';
+        link.rel = 'shortcut icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = iconUrl;
+    }
+  }, [activeSchool?.branding?.icon, activeSchool?.logo, activeSchool?.name]);
 
   useEffect(() => {
     const init = async () => {
@@ -145,10 +167,23 @@ function RootLayoutContent() {
 
     const inAuthGroup = segments[0] === '(auth)';
 
-    if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)');
+    if (!isAuthenticated) {
+      if (!inAuthGroup) {
+        router.replace('/(auth)/login' as any);
+      }
+    } else {
+      // User is authenticated
+      const user = useAuthStore.getState().user;
+      
+      if (user?.role === 'admin' && !user.schoolId) {
+        // Admin must create a school
+        if (segments[1] !== ('school-register' as any)) {
+          router.replace('/(auth)/school-register' as any);
+        }
+      } else if (inAuthGroup) {
+        // Authenticated users shouldn't be in auth screens
+        router.replace('/(tabs)' as any);
+      }
     }
   }, [isAuthenticated, isReady, isAuthLoading, isUnlocked, segments]);
 
@@ -191,6 +226,8 @@ function RootLayoutContent() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="course/[id]/index" />
         <Stack.Screen name="course/[id]/content" />
+        <Stack.Screen name="schools/index" />
+        <Stack.Screen name="schools/[schoolSlug]" />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       </View>

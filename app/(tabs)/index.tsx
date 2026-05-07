@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+
 function useHomeLogic() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -42,7 +43,15 @@ function useHomeLogic() {
     const init = async () => {
       await fetchCourses();
       updateStreak();
-      getAIRecommendations(['Technology', 'Design', 'Development']);
+      // Use actual enrolled course categories as interests
+      const enrolledCategories = courses
+        .filter(c => enrolledCourses.includes(c.id))
+        .map(c => c.category)
+        .filter(Boolean);
+      const interests = enrolledCategories.length > 0
+        ? [...new Set(enrolledCategories)]
+        : ['Technology', 'Web Dev', 'AI & ML'];
+      getAIRecommendations(interests);
     };
     init();
   }, []);
@@ -51,9 +60,16 @@ function useHomeLogic() {
     setIsRefreshing(true);
     await refreshCourses();
     updateStreak();
-    getAIRecommendations(['Technology', 'Design', 'Development']);
+    const enrolledCategories = courses
+      .filter(c => enrolledCourses.includes(c.id))
+      .map(c => c.category)
+      .filter(Boolean);
+    const interests = enrolledCategories.length > 0
+      ? [...new Set(enrolledCategories)]
+      : ['Technology', 'Web Dev', 'AI & ML'];
+    getAIRecommendations(interests);
     setIsRefreshing(false);
-  }, [refreshCourses, getAIRecommendations]);
+  }, [refreshCourses, getAIRecommendations, courses, enrolledCourses]);
 
   const handleCoursePress = useCallback((course: Course) => {
     router.push(`/course/${course.id}` as Href);

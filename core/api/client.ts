@@ -8,8 +8,7 @@ const REFRESH_TOKEN_KEY = "refreshToken";
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_RETRY_COUNT = 3;
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, "") ||
-  "https://api.freeapi.app";
+  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retryCount?: number;
@@ -47,7 +46,7 @@ async function refreshAccessToken() {
 
   try {
     const response = await axios.post(
-      `${API_BASE_URL}/api/v1/users/refresh-token`,
+      `${API_BASE_URL}/auth/refresh`,
       { refreshToken },
       { timeout: REQUEST_TIMEOUT_MS },
     );
@@ -117,7 +116,7 @@ apiClient.interceptors.response.use(
     }
 
     const isRefreshRequest = originalRequest.url?.includes(
-      "/api/v1/users/refresh-token",
+      "/auth/refresh",
     );
 
     if (

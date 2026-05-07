@@ -39,8 +39,8 @@ interface CourseState {
   getAIRecommendations: (interests: string[]) => Promise<void>;
   setAiRecommendedIds: (ids: string[]) => void;
   searchCourses: (query: string) => void;
-  toggleBookmark: (courseId: string) => void;
-  enrollCourse: (courseId: string) => void;
+  toggleBookmark: (courseId: string) => Promise<void>;
+  enrollCourse: (courseId: string) => Promise<void>;
   unenrollCourse: (courseId: string) => void;
   completeCourse: (courseId: string) => void;
   updateQuizScore: (courseId: string, score: number) => void;
@@ -122,16 +122,11 @@ export const useCourseStore = create<CourseState>()(
 
         set({ isLoading: true, error: null });
         try {
-          const [instructors, products] = await Promise.all([
-            coursesApi.fetchInstructors(),
-            coursesApi.fetchProducts(),
-          ]);
-
-          const mergedCourses = coursesApi.mergeCourses(instructors, products);
+          const fetchedCourses = await coursesApi.fetchCourses();
 
           set({
-            courses: mergedCourses,
-            filteredCourses: mergedCourses,
+            courses: fetchedCourses,
+            filteredCourses: fetchedCourses,
             lastFetched: now,
             error: null,
             isLoading: false,
@@ -178,16 +173,25 @@ export const useCourseStore = create<CourseState>()(
         set({ searchQuery: query, filteredCourses: filtered });
       },
 
-      toggleBookmark: (courseId: string) => {
+      toggleBookmark: async (courseId: string) => {
         const { bookmarks, courses, addTimelineEvent } = get();
-        let newBookmarks;
         const isBookmarked = bookmarks.includes(courseId);
 
-        if (isBookmarked) {
-          newBookmarks = bookmarks.filter((id) => id !== courseId);
-          analytics.logEvent('course_bookmark', { courseId, action: 'removed' });
-        } else {
-          newBookmarks = [...bookmarks, courseId];
+        // Optimistic update
+        const newBookmarks = isBookmarked
+          ? bookmarks.filter((id) => id !== courseId)
+          : [...bookmarks, courseId];
+        set({ bookmarks: newBookmarks });
+
+        try {
+          await coursesApi.toggleBookmark(courseId);
+        } catch {
+          // Rollback on failure
+          set({ bookmarks });
+          return;
+        }
+
+        if (!isBookmarked) {
           const course = courses.find((c) => c.id === courseId);
           if (course) {
             addTimelineEvent({
@@ -198,31 +202,43 @@ export const useCourseStore = create<CourseState>()(
             });
           }
           analytics.logEvent('course_bookmark', { courseId, action: 'added' });
-        }
-
-        set({ bookmarks: newBookmarks });
-
-        // Trigger notification check
-        if (newBookmarks.length >= 5) {
-          scheduleBookmarkMilestoneNotification();
+          if (newBookmarks.length >= 5) {
+            scheduleBookmarkMilestoneNotification();
+          }
+        } else {
+          analytics.logEvent('course_bookmark', { courseId, action: 'removed' });
         }
       },
 
-      enrollCourse: (courseId: string) => {
+      enrollCourse: async (courseId: string) => {
         const { enrolledCourses, courses, addTimelineEvent } = get();
-        if (!enrolledCourses.includes(courseId)) {
-          set({ enrolledCourses: [...enrolledCourses, courseId] });
-          const course = courses.find((c) => c.id === courseId);
-          if (course) {
-            addTimelineEvent({
-              courseId,
-              title: course.title,
-              action: `Enrolled in "${course.title}"`,
-              type: 'enroll',
-            });
+        if (enrolledCourses.includes(courseId)) return;
+
+        // Optimistic update
+        set({ enrolledCourses: [...enrolledCourses, courseId] });
+
+        try {
+          await coursesApi.enroll(courseId);
+        } catch (err: any) {
+          // 409 = already enrolled on server — keep local state
+          // 402 = payment required — rollback
+          if (err?.response?.status === 402) {
+            set({ enrolledCourses });
+            throw err;
           }
-          analytics.logEvent('course_enroll', { courseId });
+          // For other errors, keep optimistic state (offline tolerance)
         }
+
+        const course = courses.find((c) => c.id === courseId);
+        if (course) {
+          addTimelineEvent({
+            courseId,
+            title: course.title,
+            action: `Enrolled in "${course.title}"`,
+            type: 'enroll',
+          });
+        }
+        analytics.logEvent('course_enroll', { courseId });
       },
 
       unenrollCourse: (courseId: string) => {
