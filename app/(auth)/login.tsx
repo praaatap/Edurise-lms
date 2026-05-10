@@ -101,7 +101,7 @@ export default function LoginScreen() {
             Welcome back Champ! 👋
           </Text>
           <Text style={{ color: C.textMuted }} className="text-base font-medium mb-8">
-            Sign in to continue your learning journey
+            Sign in to continue your learning journey 🔐
           </Text>
 
           {/* React Hook Form + Zod fields */}

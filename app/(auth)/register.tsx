@@ -152,10 +152,10 @@ export default function RegisterScreen() {
           style={{ backgroundColor: C.background }}
         >
           <Text style={{ color: C.text }} className="text-2xl font-extrabold tracking-tight mb-1">
-            Join the Community 🚀
+            Join the Community!
           </Text>
           <Text style={{ color: C.textMuted }} className="text-sm font-medium mb-6">
-            Choose your role and start your journey
+            Choose your role and start your journey 🔐
           </Text>
 
           {/* Role Selector */}
