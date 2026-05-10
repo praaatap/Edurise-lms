@@ -18,7 +18,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.pratapsingh9.EduriseLMS"
+      "package": "com.pratapsingh9.EduriseLMS",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -59,11 +63,15 @@
     },
     "extra": {
       "router": {},
-
-      
       "eas": {
         "projectId": "e3b1f6c9-3e0c-4160-8879-5bc2394ca0fa"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e3b1f6c9-3e0c-4160-8879-5bc2394ca0fa"
     }
   }
 }

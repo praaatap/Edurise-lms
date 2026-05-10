@@ -1,10 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 const MILESTONE_KEY = "@bookmark_milestone_reached";
 const REMINDER_NOTIFICATION_ID_KEY = "@engagement_reminder_notification_id";
 const COURSE_REMINDER_NOTIFICATION_KEY = "@course_reengagement_reminder";
+const PUSH_TOKEN_KEY = "@expo_push_token";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -33,6 +35,46 @@ export async function requestPermissions() {
     finalStatus = status;
   }
   return finalStatus === "granted";
+}
+
+/**
+ * Registers for real FCM (Android) / APNs (iOS) push notifications.
+ * Returns the Expo push token string, or null if unavailable.
+ * In production, send this token to your backend so it can send targeted pushes.
+ */
+export async function registerForPushNotifications(): Promise<string | null> {
+  // Physical device required — simulators do not support push tokens
+  const granted = await requestPermissions();
+  if (!granted) return null;
+
+  try {
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
+
+    if (!projectId) {
+      console.warn("[Push] No EAS projectId found in app config.");
+      return null;
+    }
+
+    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+
+    // Persist locally — in a real app, POST this to your backend API
+    await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+
+    // TODO: send token to your backend
+    // await api.post('/users/push-token', { token });
+
+    return token;
+  } catch (error) {
+    console.warn("[Push] Failed to get push token:", error);
+    return null;
+  }
+}
+
+/** Returns the Expo push token previously registered on this device, or null. */
+export async function getStoredPushToken(): Promise<string | null> {
+  return AsyncStorage.getItem(PUSH_TOKEN_KEY);
 }
 
 export async function scheduleBookmarkMilestoneNotification() {

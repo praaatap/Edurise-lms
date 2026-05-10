@@ -78,6 +78,7 @@ export default function CourseContentScreen() {
 
   const handleMessage = (event: any) => {
     try {
+      // {eventType:"Quiz", { score:50,courseId:"1" }}
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'COMPLETE_COURSE') {
         shouldScheduleReminderRef.current = false;
@@ -204,8 +205,7 @@ export default function CourseContentScreen() {
           onLoadProgress={({ nativeEvent }) => setProgress(nativeEvent.progress)}
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={(request) => {
-            // Security: Prevent navigation to external sites inside this content viewer
-            return request.url.startsWith('https://mini-lms.local');
+            return request.url.startsWith('https://houseofedtech.com');
           }}
           onMessage={handleMessage}
           onError={() => {

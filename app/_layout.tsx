@@ -17,6 +17,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as Notifications from 'expo-notifications';
 import {
   AppState,
   Platform,
@@ -24,6 +25,7 @@ import {
   View,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CustomDialog } from '@/shared/components/ui/CustomDialog';
 import { AnimatedSplashScreen } from '@/shared/components/ui/AnimatedSplashScreen';
 import { Colors } from '@/core/theme/colors';
@@ -34,8 +36,23 @@ import { useNetworkStatus } from '@/shared/utils/network';
 import { ErrorBoundary } from '@/shared/components/ui/ErrorBoundary';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useThemeStore } from '@/core/theme/themeStore';
-import { requestPermissions, scheduleReminderNotification } from '@/features/notifications/services/notificationService';
+import {
+  registerForPushNotifications,
+  requestPermissions,
+  scheduleReminderNotification,
+} from '@/features/notifications/services/notificationService';
 import { analytics } from '@/core/services/analyticsService';
+
+// Single QueryClient instance for the entire app lifetime
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 min — matches Zustand cache TTL
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Initialize Sentry — only when a real DSN is provided via environment variable
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
@@ -78,21 +95,31 @@ function RootLayoutContent() {
     const init = async () => {
       // 0. Analytics & Linking init
       await analytics.init();
+
+      // Deep-link on cold start — route to the right screen if the app was
+      // opened via a universal link or a notification tap
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) {
-
+        const parsed = Linking.parse(initialUrl);
+        // e.g. edurise://course/123  →  { path: 'course/123', ... }
+        if (parsed.path) {
+          router.push(`/${parsed.path}` as any);
+        }
       }
 
       // 1. Auth check
       await checkAuth();
 
-      // 2. Notification permissions
+      // 2. Notification permissions + FCM/APNs push token registration
       const notificationsEnabled = await requestPermissions();
       if (notificationsEnabled) {
         await scheduleReminderNotification();
+        // Register and obtain the FCM (Android) / APNs (iOS) push token.
+        // In production the token would be sent to your backend here.
+        void registerForPushNotifications();
       }
 
-      // 4. Biometric Unlock Check
+      // 3. Biometric Unlock Check
       const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
       if (biometricEnabled === 'true' && useAuthStore.getState().isAuthenticated) {
         const result = await LocalAuthentication.authenticateAsync({
@@ -115,7 +142,7 @@ function RootLayoutContent() {
       }
 
       setIsReady(true);
-      
+
       // Check initial network state
       const state = await NetInfo.fetch();
       if (!state.isConnected) {
@@ -127,6 +154,30 @@ function RootLayoutContent() {
     };
     init();
   }, []);
+
+  // Notification tap deep-link handler (app already open / background)
+  // When the user taps a push notification, route them to the correct screen.
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as {
+          type?: string;
+          courseId?: string;
+          url?: string;
+        };
+
+        if (data.courseId) {
+          // e.g. course re-engagement notification → open course detail
+          router.push(`/course/${data.courseId}` as any);
+        } else if (data.url) {
+          // Generic deep-link payload from server-sent push
+          const parsed = Linking.parse(data.url);
+          if (parsed.path) router.push(`/${parsed.path}` as any);
+        }
+      }
+    );
+    return () => subscription.remove();
+  }, [router]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -196,31 +247,35 @@ function RootLayoutContent() {
       </View>
     </ThemeProvider>
   );
-}
+} 
 
 
 export default Sentry.wrap(function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View 
-        style={{ 
-          flex: 1, 
-          maxWidth: Platform.OS === 'web' ? 480 : undefined, 
-          width: '100%', 
-          alignSelf: 'center', 
-          overflow: 'hidden',
-          ...(Platform.OS === 'web' ? {
-            boxShadow: '0 0 20px rgba(0,0,0,0.05)',
-            borderLeftWidth: 1,
-            borderRightWidth: 1,
-            borderColor: '#e2e8f0',
-          } : {})
-        }}
-      >
-        <ErrorBoundary>
-          <RootLayoutContent />
-        </ErrorBoundary>
-      </View>
-    </GestureHandlerRootView>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View
+          style={{
+            flex: 1,
+            maxWidth: Platform.OS === 'web' ? 480 : undefined,
+            width: '100%',
+            alignSelf: 'center',
+            overflow: 'hidden',
+            ...(Platform.OS === 'web'
+              ? {
+                  boxShadow: '0 0 20px rgba(0,0,0,0.05)',
+                  borderLeftWidth: 1,
+                  borderRightWidth: 1,
+                  borderColor: '#e2e8f0',
+                }
+              : {}),
+          }}
+        >
+          <ErrorBoundary>
+            <RootLayoutContent />
+          </ErrorBoundary>
+        </View>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 });
