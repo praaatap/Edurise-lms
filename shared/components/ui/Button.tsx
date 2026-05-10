@@ -1,15 +1,18 @@
 import { Colors } from '@/core/theme/colors';
 import React from 'react';
-import { TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, ActivityIndicator, View } from 'react-native';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
   isLoading?: boolean;
   disabled?: boolean;
   className?: string;
   textClassName?: string;
+  style?: any;
+  rightIcon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
 }
 
 export const Button = React.memo(({
@@ -20,6 +23,9 @@ export const Button = React.memo(({
   disabled = false,
   className = '',
   textClassName = '',
+  style,
+  rightIcon,
+  leftIcon,
 }: ButtonProps) => {
   const getVariantClasses = () => {
     switch (variant) {
@@ -27,6 +33,8 @@ export const Button = React.memo(({
         return 'bg-secondary';
       case 'ghost':
         return 'bg-transparent border border-border';
+      case 'outline':
+        return 'bg-transparent border border-primary';
       case 'danger':
         return 'bg-error';
       case 'primary':
@@ -39,6 +47,8 @@ export const Button = React.memo(({
     switch (variant) {
       case 'ghost':
         return Colors.text;
+      case 'outline':
+        return Colors.primary;
       default:
         return 'white';
     }
@@ -50,15 +60,21 @@ export const Button = React.memo(({
       onPress={onPress}
       disabled={disabled || isLoading}
       activeOpacity={0.7}
+      style={style}
     >
       {isLoading ? (
         <ActivityIndicator color={getTextColor()} />
       ) : (
-        <Text 
-          className={`text-base font-bold ${variant === 'ghost' ? 'text-text' : 'text-white'} ${textClassName}`}
-        >
-          {title}
-        </Text>
+        <>
+          {leftIcon && <View style={{ marginRight: 8 }}>{leftIcon}</View>}
+          <Text 
+            className={`text-base font-bold ${variant === 'ghost' ? 'text-text' : variant === 'outline' ? 'text-primary' : 'text-white'} ${textClassName}`}
+            style={{ color: getTextColor() }}
+          >
+            {title}
+          </Text>
+          {rightIcon && <View style={{ marginLeft: 8 }}>{rightIcon}</View>}
+        </>
       )}
     </TouchableOpacity>
   );

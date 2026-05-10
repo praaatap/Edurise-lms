@@ -3,6 +3,7 @@ import { useTheme } from '@/core/theme/useTheme';
 import { CourseCard } from '@/features/courses/components/CourseCard';
 import { SearchBar } from '@/features/courses/components/SearchBar';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import { coursesApi } from '@/features/courses/api/coursesApi';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
 import { Course } from '@/shared/types';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
@@ -10,7 +11,7 @@ import { LegendList } from '@legendapp/list';
 import * as Haptics from 'expo-haptics';
 import { Href, useRouter } from 'expo-router';
 import { Code, SlidersHorizontal, X } from 'lucide-react-native';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
@@ -28,52 +29,84 @@ const CATEGORIES = [
 const LEVELS = ['All', 'Beginner', 'Intermediate', 'Advanced'];
 const PRICE_RANGES = ['All', 'Free', 'Paid'];
 
+const SORT_TO_PARAM: Record<string, string> = {
+  'Newest': 'createdAt:desc',
+  'Price: Low to High': 'price:asc',
+  'Price: High to Low': 'price:desc',
+  'Highest Rated': 'rating:desc',
+};
+
 function useExploreLogic() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { courses, searchQuery, searchCourses, bookmarks, toggleBookmark, aiRecommendedIds, refreshCourses, isLoading } = useCourseStore();
+  const { bookmarks, toggleBookmark } = useCourseStore();
+
+  const [results, setResults] = useState<Course[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [selectedPrice, setSelectedPrice] = useState('All');
   const [sortBy, setSortBy] = useState('Newest');
 
-  const filteredCourses = useMemo(() => {
-    if (aiRecommendedIds.length > 0) {
-      return courses.filter((c) => aiRecommendedIds.includes(c.id));
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchResults = useCallback(async (params: {
+    search?: string;
+    category?: string;
+    difficulty?: string;
+    sort?: string;
+  }) => {
+    setIsLoading(true);
+    try {
+      const query: Record<string, string> = { limit: '50' };
+      if (params.search) query.search = params.search;
+      if (params.category && params.category !== 'All') query.category = params.category;
+      if (params.difficulty && params.difficulty !== 'All') query.difficulty = params.difficulty.toUpperCase();
+      if (params.sort) query.sort = params.sort;
+
+      const courses = await coursesApi.fetchCourses(query as any);
+
+      // Client-side price filter (backend doesn't have it)
+      const priceFilter = selectedPrice;
+      const filtered = courses.filter(c => {
+        if (priceFilter === 'Free') return c.price === 0;
+        if (priceFilter === 'Paid') return c.price > 0;
+        return true;
+      });
+
+      setResults(filtered);
+    } catch {
+      setResults([]);
+    } finally {
+      setIsLoading(false);
     }
+  }, [selectedPrice]);
 
-    return courses.filter((course) => {
-      const matchesSearch =
-        !searchQuery ||
-        course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        course.category.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesCategory =
-        selectedCategory === 'All' || course.category === selectedCategory;
-
-      const matchesLevel =
-        selectedLevel === 'All' || course.level === selectedLevel;
-
-      const matchesPrice =
-        selectedPrice === 'All' ||
-        (selectedPrice === 'Free' ? course.price === 0 : course.price > 0);
-
-      return matchesSearch && matchesCategory && matchesLevel && matchesPrice;
-    }).sort((a, b) => {
-      if (sortBy === 'Price: Low to High') return a.price - b.price;
-      if (sortBy === 'Price: High to Low') return b.price - a.price;
-      if (sortBy === 'Highest Rated') return b.rating - a.rating;
-      return 0; // Default: Newest (assuming data order is newest)
+  // Fetch when filters change
+  useEffect(() => {
+    fetchResults({
+      search: searchQuery,
+      category: selectedCategory,
+      difficulty: selectedLevel,
+      sort: SORT_TO_PARAM[sortBy],
     });
-  }, [courses, searchQuery, selectedCategory, selectedLevel, selectedPrice, aiRecommendedIds, sortBy]);
+  }, [selectedCategory, selectedLevel, sortBy]);
 
   const handleSearch = useCallback((text: string) => {
-    searchCourses(text);
-    if (text.length > 2) {
-      analytics.logEvent('search_performed', { query: text });
-    }
-  }, [searchCourses]);
+    setSearchQuery(text);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      fetchResults({
+        search: text,
+        category: selectedCategory,
+        difficulty: selectedLevel,
+        sort: SORT_TO_PARAM[sortBy],
+      });
+      if (text.length > 2) analytics.logEvent('search_performed', { query: text });
+    }, 400);
+  }, [selectedCategory, selectedLevel, sortBy, fetchResults]);
 
   const handleCategoryPress = useCallback((category: string) => {
     setSelectedCategory(category);
@@ -88,18 +121,24 @@ function useExploreLogic() {
     setSelectedLevel('All');
     setSelectedPrice('All');
     setSelectedCategory('All');
-    searchCourses('');
-  }, [searchCourses]);
+    setSearchQuery('');
+    setSortBy('Newest');
+  }, []);
 
   const handleRefresh = useCallback(async () => {
-    await refreshCourses();
-  }, [refreshCourses]);
+    await fetchResults({
+      search: searchQuery,
+      category: selectedCategory,
+      difficulty: selectedLevel,
+      sort: SORT_TO_PARAM[sortBy],
+    });
+  }, [fetchResults, searchQuery, selectedCategory, selectedLevel, sortBy]);
 
   const listPaddingHorizontal = width > 600 ? (width - 600) / 2 : 16;
 
   return {
     insets,
-    filteredCourses,
+    filteredCourses: results,
     searchQuery,
     bookmarks,
     toggleBookmark,
@@ -114,7 +153,7 @@ function useExploreLogic() {
     resetFilters,
     sortBy,
     setSortBy,
-    aiRecommendedIds,
+    aiRecommendedIds: [] as string[],
     handleRefresh,
     isLoading,
     listPaddingHorizontal,

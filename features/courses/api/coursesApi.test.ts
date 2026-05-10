@@ -12,49 +12,53 @@ describe('Courses API', () => {
     jest.clearAllMocks();
   });
 
-  it('should fetch instructors', async () => {
-    (apiClient.get as jest.Mock).mockResolvedValueOnce({ 
-      data: { data: { data: [{ login: { uuid: '1' } }] } } 
-    });
-    
-    const res = await coursesApi.fetchInstructors();
-    
-    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/public/randomusers?limit=20');
-    expect(res[0].login.uuid).toBe('1');
-  });
-
-  it('should fetch products', async () => {
-    (apiClient.get as jest.Mock).mockResolvedValueOnce({ 
-      data: { data: { data: [{ id: '1', price: 10 }] } } 
-    });
-    
-    const res = await coursesApi.fetchProducts();
-    
-    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/public/randomproducts?limit=20');
-    expect(res[0].id).toBe('1');
-  });
-
-  it('should merge courses correctly', () => {
-    const mockInstructors = [
-      {
-        login: { uuid: 'inst1' },
-        name: { first: 'John', last: 'Doe' },
-        location: { city: 'NY', country: 'US' },
-        email: 'john@example.com',
-        picture: { large: 'avatar.jpg' }
+  it('should fetch courses from backend', async () => {
+    (apiClient.get as jest.Mock).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [
+          {
+            id: 'course-1',
+            title: 'Test Course',
+            description: 'A test course',
+            price: '49.99',
+            thumbnailUrl: 'https://example.com/thumb.jpg',
+            category: 'Web Dev',
+            difficulty: 'BEGINNER',
+            rating: 4.5,
+            totalLessons: 10,
+            instructorName: 'John Doe',
+          }
+        ],
       }
-    ];
+    });
 
-    const mockProducts = [
-      { id: 'prod1', price: 29.99 }
-    ];
+    const courses = await coursesApi.fetchCourses();
 
-    const merged = coursesApi.mergeCourses(mockInstructors, mockProducts);
-    
-    expect(merged).toHaveLength(1);
-    expect(merged[0].id).toBe('prod1');
-    expect(merged[0].instructor.name).toBe('John Doe');
-    expect(merged[0].price).toBe(29.99);
-    expect(merged[0].level).toBe('Beginner');
+    expect(apiClient.get).toHaveBeenCalledWith('/courses', { params: { limit: 50 } });
+    expect(courses).toHaveLength(1);
+    expect(courses[0].id).toBe('course-1');
+    expect(courses[0].title).toBe('Test Course');
+    expect(courses[0].price).toBe(49.99);
+    expect(courses[0].level).toBe('Beginner');
+  });
+
+  it('should handle empty courses response', async () => {
+    (apiClient.get as jest.Mock).mockResolvedValueOnce({
+      data: { success: true, data: [] }
+    });
+
+    const courses = await coursesApi.fetchCourses();
+    expect(courses).toHaveLength(0);
+  });
+
+  it('should return empty arrays from legacy mock methods', async () => {
+    const instructors = await coursesApi.fetchInstructors();
+    const products = await coursesApi.fetchProducts();
+    const merged = coursesApi.mergeCourses([], []);
+
+    expect(instructors).toHaveLength(0);
+    expect(products).toHaveLength(0);
+    expect(merged).toHaveLength(0);
   });
 });

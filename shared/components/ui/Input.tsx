@@ -9,9 +9,10 @@ interface InputProps extends TextInputProps {
   error?: string;
   hint?: string;
   leftIcon?: React.ReactNode;
+  containerStyle?: any;
 }
 
-export const Input = React.memo(({ label, error, hint, leftIcon, secureTextEntry, className = '', ...props }: InputProps) => {
+export const Input = React.memo(({ label, error, hint, leftIcon, containerStyle, secureTextEntry, className = '', ...props }: InputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const { C } = useTheme();
@@ -19,7 +20,7 @@ export const Input = React.memo(({ label, error, hint, leftIcon, secureTextEntry
   const isPassword = secureTextEntry;
 
   return (
-    <View className={`mb-4 ${className}`}>
+    <View style={containerStyle} className={`mb-4 ${className}`}>
       {label && (
         <Text style={{ color: C.textMuted }} className="text-sm font-semibold mb-2 ml-0.5">
           {label}
