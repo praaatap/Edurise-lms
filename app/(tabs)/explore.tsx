@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
 import { trackUserAction } from '@/core/services/sentryPerformance';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+import { clarityService } from '@/core/services/clarityService';
 const CATEGORIES = [
   'All',
   'Web Dev',
@@ -77,6 +78,7 @@ function useExploreLogic() {
     searchCourses(text);
     if (text.length > 2) {
       trackUserAction('search', { query: text });
+      clarityService.logEvent('course_searched', { query: text });
       analytics.logEvent('search_performed', { query: text });
     }
   }, [searchCourses]);
@@ -357,6 +359,7 @@ export default function TechExploreScreen() {
             className="bg-primary w-full py-4 rounded-2xl items-center justify-center shadow-lg"
             onPress={() => {
               trackUserAction('filters_applied', { level: selectedLevel, price: selectedPrice, sortBy });
+              clarityService.logEvent('course_filter_applied', { level: selectedLevel, price: selectedPrice });
               analytics.logEvent('filter_applied', { level: selectedLevel, price: selectedPrice, sortBy });
               bottomSheetRef.current?.close();
             }}

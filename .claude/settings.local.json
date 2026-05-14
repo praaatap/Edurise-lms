@@ -11,7 +11,13 @@
       "Bash(cat node_modules/react-native-clarity/src/index.tsx)",
       "Bash(npx expo *)",
       "Bash(npx ts-node *)",
-      "Bash(node scripts/verify-monitoring.js)"
+      "Bash(node scripts/verify-monitoring.js)",
+      "Bash(node -e \"const p = require\\('./node_modules/react-native-clarity/package.json'\\); console.log\\(p.version\\); console.log\\(Object.keys\\(p.exports || {}\\)\\); \")",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:unpkg.com)"
     ]
   }
 }

@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Pencil, TriangleAlert, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { analytics } from '@/core/services/analyticsService';
+import { clarityService } from '@/core/services/clarityService';
 import { trackUserAction } from '@/core/services/sentryPerformance';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import {
@@ -123,6 +124,12 @@ export default function CourseContentScreen() {
   };
 
   useScreenTracking(course ? `CourseContent_${course.id}` : 'CourseContent');
+
+  useEffect(() => {
+    if (course) {
+      clarityService.logEvent('course_content_opened', { courseId: course.id, title: course.title });
+    }
+  }, [course?.id]);
 
   useEffect(() => {
     void clearCourseReminderNotification();

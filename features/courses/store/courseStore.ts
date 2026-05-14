@@ -1,6 +1,7 @@
 import { coursesApi } from "@/features/courses/api/coursesApi";
 import { aiService } from '@/features/courses/utils/ai';
 import { scheduleBookmarkMilestoneNotification, scheduleEnrollmentNotification } from '@/features/notifications/services/notificationService';
+import { clarityService } from '@/core/services/clarityService';
 import { Course } from "@/shared/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from 'axios';
@@ -191,10 +192,12 @@ export const useCourseStore = create<CourseState>()(
 
         if (isBookmarked) {
           newBookmarks = bookmarks.filter((id) => id !== courseId);
+          clarityService.logEvent('course_unbookmarked', { courseId });
           analytics.logEvent('course_bookmark', { courseId, action: 'removed' });
         } else {
           newBookmarks = [...bookmarks, courseId];
           const course = courses.find((c) => c.id === courseId);
+          clarityService.logEvent('course_bookmarked', { courseId, title: course?.title ?? '' });
           if (course) {
             addTimelineEvent({
               courseId,
@@ -228,8 +231,9 @@ export const useCourseStore = create<CourseState>()(
               type: 'enroll',
             });
           }
+          clarityService.logEvent('course_enrolled', { courseId, title: course?.title ?? '' });
           analytics.logEvent('course_enroll', { courseId });
-          scheduleEnrollmentNotification(course.title);
+          if (course) scheduleEnrollmentNotification(course.title);
         }
       },
 
@@ -239,6 +243,7 @@ export const useCourseStore = create<CourseState>()(
           enrolledCourses: enrolledCourses.filter(id => id !== courseId),
           completedCourses: completedCourses.filter(id => id !== courseId)
         });
+        clarityService.logEvent('course_unenrolled', { courseId });
         analytics.logEvent('course_unenroll', { courseId });
       },
 
@@ -267,7 +272,7 @@ export const useCourseStore = create<CourseState>()(
             type: 'complete',
           });
         }
-        // Use a generic event name or add 'course_complete' to type
+        clarityService.logEvent('course_completed', { courseId });
         analytics.logEvent('quiz_complete', { courseId, type: 'course_finished' });
       },
 
@@ -305,6 +310,7 @@ export const useCourseStore = create<CourseState>()(
             [courseId]: [note, ...courseNotes],
           },
         });
+        clarityService.logEvent('course_note_saved', { courseId });
         analytics.logEvent('course_note_added', { courseId, totalNotes: courseNotes.length + 1 });
       },
 

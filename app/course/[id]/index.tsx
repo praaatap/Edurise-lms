@@ -28,6 +28,7 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSequence, withS
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
 import { trackUserAction } from '@/core/services/sentryPerformance';
+import { clarityService } from '@/core/services/clarityService';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 
 // Extracted Components
@@ -79,6 +80,7 @@ export default function CourseDetailScreen() {
   useEffect(() => {
     if (course) {
       analytics.logEvent('course_view', { courseId: course.id, title: course.title });
+      clarityService.logEvent('course_viewed', { courseId: course.id, title: course.title, price: course.price });
     }
   }, [course?.id]);
 

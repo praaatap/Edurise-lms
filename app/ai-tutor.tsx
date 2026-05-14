@@ -4,6 +4,7 @@ import { processUserMessage } from '@/features/ai/services/groqAgent';
 import { useAIStore } from '@/features/ai/store/aiStore';
 import { analytics } from '@/core/services/analyticsService';
 import { trackUserAction } from '@/core/services/sentryPerformance';
+import { clarityService } from '@/core/services/clarityService';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { LegendList } from '@legendapp/list';
@@ -45,6 +46,7 @@ export default function AITutorScreen() {
 
   useEffect(() => {
     analytics.logEvent('ai_chat_open');
+    clarityService.logEvent('ai_chat_opened');
   }, []);
 
   // Auto-scroll to bottom when new messages arrive
@@ -62,6 +64,8 @@ export default function AITutorScreen() {
     if (!hasText && !hasImage) return;
 
     trackUserAction('ai_message_sent', { length: text.trim().length, hasImage });
+    clarityService.logEvent('ai_message_sent', { length: text.trim().length, has_image: hasImage });
+    if (hasImage) clarityService.logEvent('ai_image_attached');
     setInputText('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 

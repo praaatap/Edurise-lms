@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+import { clarityService } from '@/core/services/clarityService';
 import {
   View,
   Text,
@@ -50,6 +51,12 @@ export default function RegisterScreen() {
   const [dialogConfig, setDialogConfig] = useState({ visible: false, title: '', message: '' });
 
   useScreenTracking('Register');
+
+  // Pause Clarity recording on register screen — password field must not be recorded
+  useEffect(() => {
+    clarityService.pauseRecording();
+    return () => clarityService.resumeRecording();
+  }, []);
 
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),

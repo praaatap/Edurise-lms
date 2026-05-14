@@ -1,15 +1,17 @@
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/core/theme/useTheme';
 import { Colors } from '@/core/theme/colors';
-import { ArrowLeft, Zap, Activity, Eye, Bug, Send, BarChart3 } from 'lucide-react-native';
+import { ArrowLeft, Zap, Activity, Eye, Bug, Send, BarChart3, ExternalLink } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Sentry from '@sentry/react-native';
+import { Linking } from 'react-native';
 import { analytics } from '@/core/services/analyticsService';
 import { clarityService } from '@/core/services/clarityService';
 import { withSentrySpan, trackUserAction, trackScreenView, trackApiRequest } from '@/core/services/sentryPerformance';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+import { useEffect, useState } from 'react';
 
 const TEST_EVENTS = [
   {
@@ -68,6 +70,26 @@ const TEST_EVENTS = [
     color: '#3B82F6',
     items: [
       {
+        label: 'Get Session URL',
+        description: 'Fetch the direct link to watch this session recording',
+        action: async () => {
+          const url = await clarityService.getSessionUrl();
+          if (url) {
+            Alert.alert(
+              '🎥 Session Recording URL',
+              url,
+              [
+                { text: 'Copy', onPress: () => {} },
+                { text: 'Open in Browser', onPress: () => Linking.openURL(url) },
+                { text: 'OK' },
+              ]
+            );
+          } else {
+            Alert.alert('Not Ready', 'Session URL not available yet. Wait a few seconds after app start and try again.');
+          }
+        },
+      },
+      {
         label: 'Set Custom Screen',
         description: 'Sets screen name to "TestScreen_Clarity"',
         action: () => {
@@ -85,6 +107,22 @@ const TEST_EVENTS = [
             value: Math.random().toFixed(4),
           });
           Alert.alert('Clarity Event', 'Custom event "test_event_fired" sent');
+        },
+      },
+      {
+        label: 'Pause Recording',
+        description: 'Pauses Clarity session capture',
+        action: () => {
+          clarityService.pauseRecording();
+          Alert.alert('Paused', 'Clarity recording is paused');
+        },
+      },
+      {
+        label: 'Resume Recording',
+        description: 'Resumes Clarity session capture',
+        action: () => {
+          clarityService.resumeRecording();
+          Alert.alert('Resumed', 'Clarity recording is active again');
         },
       },
     ],
@@ -160,8 +198,21 @@ export default function EventTestingScreen() {
   const { C, isDark } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [sessionUrl, setSessionUrl] = useState<string | null>(clarityService.sessionUrl);
 
   useScreenTracking('EventTesting');
+
+  useEffect(() => {
+    // Poll for session URL — it becomes available a few seconds after init
+    const interval = setInterval(async () => {
+      const url = await clarityService.getSessionUrl();
+      if (url) {
+        setSessionUrl(url);
+        clearInterval(interval);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handlePress = async (action: () => void | Promise<void>) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -184,6 +235,38 @@ export default function EventTestingScreen() {
         </View>
         <Bug size={24} color={Colors.primary} />
       </View>
+
+      {/* Clarity Session URL Banner */}
+      {sessionUrl ? (
+        <TouchableOpacity
+          onPress={() => Linking.openURL(sessionUrl)}
+          style={{
+            marginHorizontal: 16, marginBottom: 4,
+            backgroundColor: isDark ? 'rgba(59,130,246,0.15)' : '#EFF6FF',
+            borderRadius: 12, padding: 12,
+            borderWidth: 1, borderColor: isDark ? 'rgba(59,130,246,0.3)' : '#BFDBFE',
+            flexDirection: 'row', alignItems: 'center', gap: 10,
+          }}
+        >
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#22C55E' }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: '700' }}>🎥 Clarity Recording Active</Text>
+            <Text style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }} numberOfLines={1}>{sessionUrl}</Text>
+          </View>
+          <ExternalLink size={16} color="#3B82F6" />
+        </TouchableOpacity>
+      ) : (
+        <View style={{
+          marginHorizontal: 16, marginBottom: 4,
+          backgroundColor: isDark ? 'rgba(107,114,128,0.1)' : '#F9FAFB',
+          borderRadius: 12, padding: 12,
+          borderWidth: 1, borderColor: C.border,
+          flexDirection: 'row', alignItems: 'center', gap: 10,
+        }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#F59E0B' }} />
+          <Text style={{ color: C.textMuted, fontSize: 12, fontWeight: '600' }}>Clarity session starting… URL will appear here</Text>
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24, gap: 24 }}

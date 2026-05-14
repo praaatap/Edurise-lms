@@ -55,6 +55,7 @@ export const useAuthStore = create<AuthState>()(
           });
           Sentry.setUser({ id: res.data.user._id, email: res.data.user.email, username: res.data.user.username });
           clarityService.identifyUser(res.data.user);
+          clarityService.logEvent('login_success', { role: res.data.user.role ?? 'user' });
           analytics.logEvent('login_success', { userId: res.data.user._id });
         } catch (error) {
           set({ isLoading: false });
@@ -71,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
             email: data.email,
             password: data.password,
           });
+          clarityService.logEvent('register_success');
           analytics.logEvent('register_success');
         } catch (error) {
           set({ isLoading: false });
@@ -80,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         trackUserAction('logout');
+        clarityService.logEvent('logout');
         await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
         await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
         Sentry.setUser(null);
