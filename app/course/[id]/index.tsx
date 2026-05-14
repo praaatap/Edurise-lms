@@ -27,13 +27,15 @@ import { ScrollView, Share, StatusBar, Text, TouchableOpacity, View } from 'reac
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { clarityService } from '@/core/services/clarityService';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 
 // Extracted Components
 import { CourseHeader } from '@/features/courses/components/CourseDetail/CourseHeader';
 import { CourseHero } from '@/features/courses/components/CourseDetail/CourseHero';
 import { CertificateModal } from '@/features/courses/components/CourseDetail/CertificateModal';
 import { EnrollmentBottomSheet } from '@/features/courses/components/CourseDetail/EnrollmentBottomSheet';
-import { ReviewsSection } from '@/features/courses/components/ReviewsSection';
 
 const AnimatedButton = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -63,17 +65,22 @@ export default function CourseDetailScreen() {
     type?: 'default' | 'destructive' | 'success';
   }>({ visible: false, title: '', message: '' });
 
+  const courseId = course?.id;
+  const courseTitle = course?.title;
   useEffect(() => {
     void clearCourseReminderNotification();
     return () => {
-      if (!course) return;
-      void scheduleCourseReengagementReminder(course.id, course.title, 60 * 60);
+      if (!courseId || !courseTitle) return;
+      void scheduleCourseReengagementReminder(courseId, courseTitle, 60 * 60);
     };
-  }, [course]);
+  }, [courseId, courseTitle]);
+
+  useScreenTracking(course ? `CourseDetail_${course.id}` : 'CourseDetail');
 
   useEffect(() => {
     if (course) {
       analytics.logEvent('course_view', { courseId: course.id, title: course.title });
+      clarityService.logEvent('course_viewed', { courseId: course.id, title: course.title, price: course.price });
     }
   }, [course?.id]);
 
@@ -85,6 +92,8 @@ export default function CourseDetailScreen() {
   const handleShare = useCallback(async () => {
     if (!course) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    trackUserAction('course_shared', { courseId: course.id });
+    analytics.logEvent('course_detail_shared', { courseId: course.id, title: course.title });
     await Share.share({
       message: `Master ${course.title} on Edurise LMS! Check it out: edurise://course/${course.id}`,
     });
@@ -92,12 +101,9 @@ export default function CourseDetailScreen() {
 
   const handleMainActionPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (!isEnrolled) {
-      router.push(`/checkout/${id}` as any);
-    } else {
-      bottomSheetRef.current?.expand();
-    }
-  }, [isEnrolled, id, router]);
+    analytics.logEvent('course_detail_enroll_sheet_opened', { courseId: id as string, isEnrolled });
+    bottomSheetRef.current?.expand();
+  }, [id, isEnrolled]);
 
   const confirmEnrollment = useCallback(async () => {
     const isAuthed = await authenticateBiometric(`Enroll in ${course?.title}`);
@@ -106,6 +112,7 @@ export default function CourseDetailScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    trackUserAction('course_enrolled', { courseId: id as string });
     btnScale.value = withSequence(withSpring(0.95), withSpring(1.05), withSpring(1));
     enrollCourse(id as string);
     bottomSheetRef.current?.close();
@@ -113,14 +120,17 @@ export default function CourseDetailScreen() {
 
   const handleUnenroll = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    trackUserAction('course_unenrolled', { courseId: id as string });
+    analytics.logEvent('course_detail_unenrolled', { courseId: id as string, title: course?.title });
     unenrollCourse(id as string);
     bottomSheetRef.current?.close();
-  }, [id, unenrollCourse]);
+  }, [id, unenrollCourse, course]);
 
   const handleGoAhead = useCallback(() => {
+    analytics.logEvent('course_detail_content_started', { courseId: id as string, title: course?.title });
     bottomSheetRef.current?.close();
     router.push(`/course/${id}/content` as any);
-  }, [id, router]);
+  }, [id, router, course]);
 
   if (!course) return null;
 
@@ -185,6 +195,7 @@ export default function CourseDetailScreen() {
                 onPress={() => {
                   Haptics.selectionAsync();
                   setActiveTab(tab);
+                  analytics.logEvent('course_detail_tab_switched', { courseId: id as string, tab });
                 }}
                 className={`mr-6 pb-3 ${activeTab === tab ? 'border-b-2 border-primary' : ''}`}
               >
@@ -219,7 +230,7 @@ export default function CourseDetailScreen() {
                 <Text className="text-[15px] text-text/70 dark:text-dark-text/70 leading-6" numberOfLines={isExpanded ? undefined : 4}>
                   {course.description}
                 </Text>
-                <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} className="mt-2 mb-6">
+                <TouchableOpacity onPress={() => { analytics.logEvent('course_detail_description_expanded', { courseId: id as string, expanded: !isExpanded }); setIsExpanded(!isExpanded); }} className="mt-2 mb-6">
                   <Text className="text-primary font-bold">{isExpanded ? 'Show Less' : 'Read Full Description'}</Text>
                 </TouchableOpacity>
 
@@ -244,6 +255,7 @@ export default function CourseDetailScreen() {
                     style={{ backgroundColor: C.surfaceElevated, borderColor: C.border }}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      analytics.logEvent('course_detail_download_all', { courseId: id as string, title: course?.title });
                       setDialogConfig({ visible: true, title: 'Download Started', message: 'The entire course is being prepared for offline use. You will be notified once it is ready.', confirmText: 'Awesome', type: 'success' });
                     }}
                   >
@@ -294,6 +306,7 @@ export default function CourseDetailScreen() {
                           style={{ backgroundColor: C.surfaceElevated, borderColor: C.border }}
                           onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            analytics.logEvent('course_detail_module_downloaded', { courseId: id as string, moduleTitle: module.title });
                             setDialogConfig({
                               visible: true,
                               title: 'Module Downloaded',
@@ -314,7 +327,54 @@ export default function CourseDetailScreen() {
 
             {activeTab === 'reviews' && (
               <Animated.View entering={FadeIn.duration(300)}>
-                <ReviewsSection courseId={id as string} isEnrolled={isEnrolled} />
+                <View className="flex-row items-center justify-between mb-6">
+                  <View>
+                    <Text style={{ color: C.text }} className="text-4xl font-extrabold">{course.rating.toFixed(1)}</Text>
+                    <View className="flex-row items-center mt-1">
+                      {[1, 2, 3, 4, 5].map(star => (
+                         <Star key={star} size={16} color="#FBBF24" fill="#FBBF24" />
+                      ))}
+                    </View>
+                    <Text style={{ color: C.textMuted }} className="text-sm font-medium mt-1">Based on {course.reviewsCount || '1.2k'} reviews</Text>
+                  </View>
+                  <View className="items-end gap-1">
+                    {[5, 4, 3, 2, 1].map((rating) => (
+                      <View key={rating} className="flex-row items-center">
+                        <Text style={{ color: C.textMuted }} className="text-xs font-bold mr-2">{rating}</Text>
+                        <View className="w-24 h-2 rounded-full overflow-hidden" style={{ backgroundColor: C.border }}>
+                          <View className="h-full bg-yellow-400 rounded-full" style={{ width: `${rating === 5 ? 70 : rating === 4 ? 20 : rating === 3 ? 5 : 2}%` }} />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {[
+                  { name: 'Sarah Jenkins', avatar: 'https://i.pravatar.cc/150?u=sarah', date: '2 weeks ago', text: 'This course completely changed my perspective. The instructor breaks down complex topics so well!', rating: 5 },
+                  { name: 'Michael Chen', avatar: 'https://i.pravatar.cc/150?u=michael', date: '1 month ago', text: 'Very detailed and well structured. I just wish there were more practical exercises in the beginning.', rating: 4 },
+                ].map((review, idx) => (
+                  <View key={idx} className="mb-6 p-4 rounded-2xl border" style={{ backgroundColor: C.surface, borderColor: C.border + '66' }}>
+                    <View className="flex-row items-center mb-3">
+                      <Image source={{ uri: review.avatar }} className="w-10 h-10 rounded-full mr-3" cachePolicy="memory-disk" />
+                      <View className="flex-1">
+                        <Text style={{ color: C.text }} className="text-base font-bold">{review.name}</Text>
+                        <View className="flex-row items-center mt-0.5">
+                          <View className="flex-row mr-2">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <Star key={star} size={12} color={star <= review.rating ? "#FBBF24" : C.border} fill={star <= review.rating ? "#FBBF24" : "none"} />
+                            ))}
+                          </View>
+                          <Text style={{ color: C.textMuted }} className="text-xs">{review.date}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={{ color: C.text + 'CC' }} className="text-[15px] leading-6">{review.text}</Text>
+                  </View>
+                ))}
+                
+                <TouchableOpacity className="w-full py-3 items-center rounded-xl border border-primary/30" onPress={() => analytics.logEvent('course_detail_see_all_reviews', { courseId: id as string })}>
+                   <Text className="text-primary font-bold">See All Reviews</Text>
+                </TouchableOpacity>
               </Animated.View>
             )}
           </View>
@@ -333,6 +393,7 @@ export default function CourseDetailScreen() {
             style={{ backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#EEF2FF', borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#C7D2FE' }}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              analytics.logEvent('course_detail_certificate_viewed', { courseId: id as string, title: course?.title });
               setIsCertificateVisible(true);
             }}
           >

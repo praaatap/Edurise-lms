@@ -1,12 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { useNotificationPrefsStore } from "@/features/settings/store/notificationPrefsStore";
 
 const MILESTONE_KEY = "@bookmark_milestone_reached";
 const REMINDER_NOTIFICATION_ID_KEY = "@engagement_reminder_notification_id";
 const COURSE_REMINDER_NOTIFICATION_KEY = "@course_reengagement_reminder";
-const PUSH_TOKEN_KEY = "@expo_push_token";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -37,47 +36,24 @@ export async function requestPermissions() {
   return finalStatus === "granted";
 }
 
-/**
- * Registers for real FCM (Android) / APNs (iOS) push notifications.
- * Returns the Expo push token string, or null if unavailable.
- * In production, send this token to your backend so it can send targeted pushes.
- */
-export async function registerForPushNotifications(): Promise<string | null> {
-  // Physical device required — simulators do not support push tokens
-  const granted = await requestPermissions();
-  if (!granted) return null;
+export async function scheduleEnrollmentNotification(courseTitle: string) {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.courseUpdates) return;
 
-  try {
-    const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ??
-      Constants.easConfig?.projectId;
-
-    if (!projectId) {
-      console.warn("[Push] No EAS projectId found in app config.");
-      return null;
-    }
-
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
-
-    // Persist locally — in a real app, POST this to your backend API
-    await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
-
-    // TODO: send token to your backend
-    // await api.post('/users/push-token', { token });
-
-    return token;
-  } catch (error) {
-    console.warn("[Push] Failed to get push token:", error);
-    return null;
-  }
-}
-
-/** Returns the Expo push token previously registered on this device, or null. */
-export async function getStoredPushToken(): Promise<string | null> {
-  return AsyncStorage.getItem(PUSH_TOKEN_KEY);
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '🎓 Enrollment Confirmed!',
+      body: `You're now enrolled in "${courseTitle}". Let's start learning!`,
+      data: { type: 'ENROLLMENT' },
+    },
+    trigger: null, // fire immediately
+  });
 }
 
 export async function scheduleBookmarkMilestoneNotification() {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.achievements) return;
+
   const hasReached = await AsyncStorage.getItem(MILESTONE_KEY);
   if (!hasReached) {
     await Notifications.scheduleNotificationAsync({
@@ -92,6 +68,9 @@ export async function scheduleBookmarkMilestoneNotification() {
 }
 
 export async function scheduleReminderNotification() {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.reminders) return;
+
   const existingReminderId = await AsyncStorage.getItem(
     REMINDER_NOTIFICATION_ID_KEY,
   );
@@ -128,6 +107,8 @@ export async function scheduleCourseReengagementReminder(
   courseTitle: string,
   delaySeconds = 60 * 60,
 ) {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.engagement) return;
   const existing = await AsyncStorage.getItem(COURSE_REMINDER_NOTIFICATION_KEY);
   if (existing) {
     try {
@@ -176,5 +157,5 @@ export async function clearCourseReminderNotification() {
 
 export async function cancelAllNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
-  await AsyncStorage.removeItem(REMINDER_NOTIFICATION_ID_KEY);
+  await AsyncStorage.multiRemove([REMINDER_NOTIFICATION_ID_KEY, COURSE_REMINDER_NOTIFICATION_KEY]);
 }

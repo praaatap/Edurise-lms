@@ -1,99 +1,54 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiClient } from '@/core/api/client';
 
 export interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: number;
+  text: string;
+  sender: 'user' | 'ai';
+  timestamp: Date;
+  courseId?: string;
 }
 
 interface AIState {
   messages: Message[];
-  sessionId: string | null;
   isTyping: boolean;
-  error: string | null;
-  sendMessage: (content: string) => Promise<void>;
-  clearHistory: () => void;
+  addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => string;
+  appendMessageChunk: (id: string, chunk: string) => void;
+  setTyping: (typing: boolean) => void;
+  clearMessages: () => void;
 }
 
-const WELCOME: Message = {
+
+const DEFAULT_MESSAGES: Message =
+{
   id: 'welcome',
-  role: 'assistant',
-  content: "Hi! I'm your Edu-Buddy 🎓 Ask me anything about your lessons, get explanations, or request a quick quiz!",
-  timestamp: Date.now(),
+  text: "Hi! I'm your AI Tutor. I can help you find courses, explain concepts, or plan your learning path. What would you like to learn today?",
+  sender: 'ai',
+  timestamp: new Date(),
 };
 
-export const useAIStore = create<AIState>()(
-  persist(
-    (set, get) => ({
-      messages: [WELCOME],
-      sessionId: null,
-      isTyping: false,
-      error: null,
+export const useAIStore = create<AIState>((set) => ({
+  messages: [
+    DEFAULT_MESSAGES
+  ],
+  isTyping: false,
 
-      sendMessage: async (content: string) => {
-        const userMsg: Message = {
-          id: `u_${Date.now()}`,
-          role: 'user',
-          content,
-          timestamp: Date.now(),
-        };
+  addMessage: (msg) => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(7);
+    set((state) => ({
+      messages: [...state.messages, { ...msg, id, timestamp: new Date() }],
+    }));
+    return id;
+  },
 
-        set((state) => ({
-          messages: [...state.messages, userMsg],
-          isTyping: true,
-          error: null,
-        }));
+  appendMessageChunk: (id, chunk) => set((state) => ({
+    messages: state.messages.map((m) =>
+      m.id === id ? { ...m, text: m.text + chunk } : m
+    )
+  })),
 
-        try {
-          const response = await apiClient.post('/ai/chat', {
-            message: content,
-            sessionId: get().sessionId ?? undefined,
-          });
+  setTyping: (isTyping) => set({ isTyping }),
 
-          const { reply, sessionId } = response.data.data;
-
-          const aiMsg: Message = {
-            id: `a_${Date.now()}`,
-            role: 'assistant',
-            content: reply,
-            timestamp: Date.now(),
-          };
-
-          set((state) => ({
-            messages: [...state.messages, aiMsg],
-            sessionId: sessionId ?? state.sessionId,
-            isTyping: false,
-          }));
-        } catch {
-          // Graceful fallback so the app doesn't crash
-          const fallback: Message = {
-            id: `a_${Date.now()}`,
-            role: 'assistant',
-            content: "I'm having trouble connecting right now. Please check your internet and try again.",
-            timestamp: Date.now(),
-          };
-          set((state) => ({
-            messages: [...state.messages, fallback],
-            isTyping: false,
-            error: 'AI service unavailable',
-          }));
-        }
-      },
-
-      clearHistory: () => set({
-        messages: [{ ...WELCOME, timestamp: Date.now() }],
-        sessionId: null,
-        error: null,
-      }),
-    }),
-    {
-      name: 'edu-buddy-storage',
-      storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ messages: state.messages.slice(-30), sessionId: state.sessionId }),
-    }
-  )
-);
+  clearMessages: () => set({
+    messages: [DEFAULT_MESSAGES]
+  }),
+}));

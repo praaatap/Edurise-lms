@@ -1,12 +1,14 @@
 import { coursesApi } from "@/features/courses/api/coursesApi";
 import { aiService } from '@/features/courses/utils/ai';
-import { scheduleBookmarkMilestoneNotification } from '@/features/notifications/services/notificationService';
+import { scheduleBookmarkMilestoneNotification, scheduleEnrollmentNotification } from '@/features/notifications/services/notificationService';
+import { clarityService } from '@/core/services/clarityService';
 import { Course } from "@/shared/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from 'axios';
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { analytics } from "@/core/services/analyticsService";
+import { withSentrySpan, trackUserAction } from "@/core/services/sentryPerformance";
 
 interface TimelineEvent {
   id: string;
@@ -39,8 +41,8 @@ interface CourseState {
   getAIRecommendations: (interests: string[]) => Promise<void>;
   setAiRecommendedIds: (ids: string[]) => void;
   searchCourses: (query: string) => void;
-  toggleBookmark: (courseId: string) => Promise<void>;
-  enrollCourse: (courseId: string) => Promise<void>;
+  toggleBookmark: (courseId: string) => void;
+  enrollCourse: (courseId: string) => void;
   unenrollCourse: (courseId: string) => void;
   completeCourse: (courseId: string) => void;
   updateQuizScore: (courseId: string, score: number) => void;
@@ -122,11 +124,20 @@ export const useCourseStore = create<CourseState>()(
 
         set({ isLoading: true, error: null });
         try {
-          const fetchedCourses = await coursesApi.fetchCourses();
+          const [instructors, products] = await withSentrySpan(
+            'fetch-courses',
+            'courses.fetch',
+            () => Promise.all([
+              coursesApi.fetchInstructors(),
+              coursesApi.fetchProducts(),
+            ]),
+          );
+
+          const mergedCourses = coursesApi.mergeCourses(instructors, products);
 
           set({
-            courses: fetchedCourses,
-            filteredCourses: fetchedCourses,
+            courses: mergedCourses,
+            filteredCourses: mergedCourses,
             lastFetched: now,
             error: null,
             isLoading: false,
@@ -141,7 +152,7 @@ export const useCourseStore = create<CourseState>()(
         if (courses.length === 0) return;
 
         try {
-          const recommended = await aiService.getRecommendedCourses(courses, interests);
+          const recommended = await withSentrySpan('ai-recommendations', 'ai.recommend', () => aiService.getRecommendedCourses(courses, interests));
           set({ recommendedCourses: recommended });
         } catch {
           // Silently fail — AI recommendations are non-critical
@@ -173,26 +184,20 @@ export const useCourseStore = create<CourseState>()(
         set({ searchQuery: query, filteredCourses: filtered });
       },
 
-      toggleBookmark: async (courseId: string) => {
+      toggleBookmark: (courseId: string) => {
         const { bookmarks, courses, addTimelineEvent } = get();
+        let newBookmarks;
         const isBookmarked = bookmarks.includes(courseId);
+        trackUserAction('toggle_bookmark', { courseId, action: isBookmarked ? 'removed' : 'added' });
 
-        // Optimistic update
-        const newBookmarks = isBookmarked
-          ? bookmarks.filter((id) => id !== courseId)
-          : [...bookmarks, courseId];
-        set({ bookmarks: newBookmarks });
-
-        try {
-          await coursesApi.toggleBookmark(courseId);
-        } catch {
-          // Rollback on failure
-          set({ bookmarks });
-          return;
-        }
-
-        if (!isBookmarked) {
+        if (isBookmarked) {
+          newBookmarks = bookmarks.filter((id) => id !== courseId);
+          clarityService.logEvent('course_unbookmarked', { courseId });
+          analytics.logEvent('course_bookmark', { courseId, action: 'removed' });
+        } else {
+          newBookmarks = [...bookmarks, courseId];
           const course = courses.find((c) => c.id === courseId);
+          clarityService.logEvent('course_bookmarked', { courseId, title: course?.title ?? '' });
           if (course) {
             addTimelineEvent({
               courseId,
@@ -202,43 +207,34 @@ export const useCourseStore = create<CourseState>()(
             });
           }
           analytics.logEvent('course_bookmark', { courseId, action: 'added' });
-          if (newBookmarks.length >= 5) {
-            scheduleBookmarkMilestoneNotification();
-          }
-        } else {
-          analytics.logEvent('course_bookmark', { courseId, action: 'removed' });
+        }
+
+        set({ bookmarks: newBookmarks });
+
+        // Trigger notification check
+        if (newBookmarks.length >= 5) {
+          scheduleBookmarkMilestoneNotification();
         }
       },
 
-      enrollCourse: async (courseId: string) => {
+      enrollCourse: (courseId: string) => {
         const { enrolledCourses, courses, addTimelineEvent } = get();
-        if (enrolledCourses.includes(courseId)) return;
-
-        // Optimistic update
-        set({ enrolledCourses: [...enrolledCourses, courseId] });
-
-        try {
-          await coursesApi.enroll(courseId);
-        } catch (err: any) {
-          // 409 = already enrolled on server — keep local state
-          // 402 = payment required — rollback
-          if (err?.response?.status === 402) {
-            set({ enrolledCourses });
-            throw err;
+        trackUserAction('enroll_course', { courseId });
+        if (!enrolledCourses.includes(courseId)) {
+          set({ enrolledCourses: [...enrolledCourses, courseId] });
+          const course = courses.find((c) => c.id === courseId);
+          if (course) {
+            addTimelineEvent({
+              courseId,
+              title: course.title,
+              action: `Enrolled in "${course.title}"`,
+              type: 'enroll',
+            });
           }
-          // For other errors, keep optimistic state (offline tolerance)
+          clarityService.logEvent('course_enrolled', { courseId, title: course?.title ?? '' });
+          analytics.logEvent('course_enroll', { courseId });
+          if (course) scheduleEnrollmentNotification(course.title);
         }
-
-        const course = courses.find((c) => c.id === courseId);
-        if (course) {
-          addTimelineEvent({
-            courseId,
-            title: course.title,
-            action: `Enrolled in "${course.title}"`,
-            type: 'enroll',
-          });
-        }
-        analytics.logEvent('course_enroll', { courseId });
       },
 
       unenrollCourse: (courseId: string) => {
@@ -247,6 +243,8 @@ export const useCourseStore = create<CourseState>()(
           enrolledCourses: enrolledCourses.filter(id => id !== courseId),
           completedCourses: completedCourses.filter(id => id !== courseId)
         });
+        clarityService.logEvent('course_unenrolled', { courseId });
+        analytics.logEvent('course_unenroll', { courseId });
       },
 
       completeCourse: (courseId: string) => {
@@ -274,7 +272,7 @@ export const useCourseStore = create<CourseState>()(
             type: 'complete',
           });
         }
-        // Use a generic event name or add 'course_complete' to type
+        clarityService.logEvent('course_completed', { courseId });
         analytics.logEvent('quiz_complete', { courseId, type: 'course_finished' });
       },
 
@@ -312,6 +310,8 @@ export const useCourseStore = create<CourseState>()(
             [courseId]: [note, ...courseNotes],
           },
         });
+        clarityService.logEvent('course_note_saved', { courseId });
+        analytics.logEvent('course_note_added', { courseId, totalNotes: courseNotes.length + 1 });
       },
 
       updateStreak: () => {
@@ -331,9 +331,12 @@ export const useCourseStore = create<CourseState>()(
         const oneDay = 24 * 60 * 60 * 1000;
 
         if (diff === oneDay) {
-          set({ streak: streak + 1, lastStreakUpdate: today });
+          const newStreak = streak + 1;
+          set({ streak: newStreak, lastStreakUpdate: today });
+          analytics.logEvent('streak_updated', { streak: newStreak, action: 'extended' });
         } else if (diff > oneDay) {
           set({ streak: 1, lastStreakUpdate: today });
+          analytics.logEvent('streak_updated', { streak: 1, action: 'reset' });
         }
       },
 

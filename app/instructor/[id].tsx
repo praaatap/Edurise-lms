@@ -1,5 +1,6 @@
 import { useTheme } from '@/core/theme/useTheme';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { CourseCard } from '@/features/courses/components/CourseCard';
 import { Course } from '@/shared/types';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -17,6 +18,8 @@ export default function InstructorProfileScreen() {
   const { C } = useTheme();
 
   const { courses, bookmarks, toggleBookmark } = useCourseStore();
+
+  useScreenTracking(`InstructorProfile_${id}`);
 
   const instructorCourses = useMemo(() => {
     return courses.filter((c) => c.instructor.id === id);

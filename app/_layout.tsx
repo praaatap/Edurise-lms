@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import 'text-encoding';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -17,7 +17,6 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as Notifications from 'expo-notifications';
 import {
   AppState,
   Platform,
@@ -25,9 +24,9 @@ import {
   View,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CustomDialog } from '@/shared/components/ui/CustomDialog';
 import { AnimatedSplashScreen } from '@/shared/components/ui/AnimatedSplashScreen';
+import { WelcomeScreen } from '@/shared/components/ui/WelcomeScreen';
 import { Colors } from '@/core/theme/colors';
 import * as Linking from 'expo-linking';
 import { OfflineBanner } from '@/shared/components/ui/OfflineBanner';
@@ -35,34 +34,28 @@ import { OfflineScreen } from '@/shared/components/ui/OfflineScreen';
 import { useNetworkStatus } from '@/shared/utils/network';
 import { ErrorBoundary } from '@/shared/components/ui/ErrorBoundary';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { useSchoolStore } from '@/features/school/store/schoolStore';
 import { useThemeStore } from '@/core/theme/themeStore';
-import {
-  registerForPushNotifications,
-  requestPermissions,
-  scheduleReminderNotification,
-} from '@/features/notifications/services/notificationService';
+import { requestPermissions, scheduleReminderNotification } from '@/features/notifications/services/notificationService';
 import { analytics } from '@/core/services/analyticsService';
-
-// Single QueryClient instance for the entire app lifetime
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 min — matches Zustand cache TTL
-      retry: 2,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+import { useUpdates } from '@/shared/hooks/useUpdates';
+import { clarityService } from '@/core/services/clarityService';
+import { trackScreenView } from '@/core/services/sentryPerformance';
 
 // Initialize Sentry — only when a real DSN is provided via environment variable
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
-    debug: false,
+    debug: __DEV__,
     enableNative: true,
+    tracesSampleRate: __DEV__ ? 1.0 : 0.3,
+    profilesSampleRate: 0.5,
+    enableAutoPerformanceTracing: true,
+    integrations: [
+      Sentry.reactNativeTracingIntegration(),
+    ],
   });
+  if (__DEV__) console.log('[Sentry] Initialized with DSN:', SENTRY_DSN.slice(0, 30) + '...');
 }
 
 export const unstable_settings = {
@@ -74,12 +67,18 @@ function RootLayoutContent() {
   const { theme: storedTheme } = useThemeStore();
   const router = useRouter();
   const segments = useSegments();
+  const pathname = usePathname();
   const { isAuthenticated, checkAuth, isLoading: isAuthLoading } = useAuthStore();
   const [isReady, setIsReady] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSplashAnimationComplete, setIsSplashAnimationComplete] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [wasAuthenticatedOnInit, setWasAuthenticatedOnInit] = useState(false);
   const { isConnected } = useNetworkStatus();
   const [showOfflineScreen, setShowOfflineScreen] = useState(false);
+  
+  // EAS Updates
+  useUpdates();
 
   const [dialogConfig, setDialogConfig] = useState<{
     visible: boolean;
@@ -92,56 +91,35 @@ function RootLayoutContent() {
   const isDark = theme === 'dark';
   const bgColor = isDark ? Colors.dark.background : Colors.background;
 
-  const { activeSchool } = useSchoolStore();
-
-  // Dynamic Web App Icon & Title Logic
-  useEffect(() => {
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const iconUrl = activeSchool?.branding?.icon || activeSchool?.logo || '/favicon.ico';
-      const title = activeSchool?.name ? `${activeSchool.name} | Edurise LMS` : 'Edurise LMS';
-
-      document.title = title;
-
-      let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.type = 'image/x-icon';
-        link.rel = 'shortcut icon';
-        document.getElementsByTagName('head')[0].appendChild(link);
-      }
-      link.href = iconUrl;
-    }
-  }, [activeSchool?.branding?.icon, activeSchool?.logo, activeSchool?.name]);
-
   useEffect(() => {
     const init = async () => {
-      // 0. Analytics & Linking init
+      // 0. Analytics, Clarity & Linking init
       await analytics.init();
-
-      // Deep-link on cold start — route to the right screen if the app was
-      // opened via a universal link or a notification tap
+      clarityService.initialize();
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) {
-        const parsed = Linking.parse(initialUrl);
-        // e.g. edurise://course/123  →  { path: 'course/123', ... }
-        if (parsed.path) {
-          router.push(`/${parsed.path}` as any);
-        }
+
       }
 
       // 1. Auth check
       await checkAuth();
 
-      // 2. Notification permissions + FCM/APNs push token registration
+      // Track if user was already authenticated on app launch
+      const authState = useAuthStore.getState();
+      setWasAuthenticatedOnInit(authState.isAuthenticated);
+
+      // Identify user in Clarity if already authenticated
+      if (authState.isAuthenticated && authState.user) {
+        clarityService.identifyUser(authState.user);
+      }
+
+      // 2. Notification permissions
       const notificationsEnabled = await requestPermissions();
       if (notificationsEnabled) {
         await scheduleReminderNotification();
-        // Register and obtain the FCM (Android) / APNs (iOS) push token.
-        // In production the token would be sent to your backend here.
-        void registerForPushNotifications();
       }
 
-      // 3. Biometric Unlock Check
+      // 4. Biometric Unlock Check
       const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
       if (biometricEnabled === 'true' && useAuthStore.getState().isAuthenticated) {
         const result = await LocalAuthentication.authenticateAsync({
@@ -164,7 +142,7 @@ function RootLayoutContent() {
       }
 
       setIsReady(true);
-
+      
       // Check initial network state
       const state = await NetInfo.fetch();
       if (!state.isConnected) {
@@ -176,30 +154,6 @@ function RootLayoutContent() {
     };
     init();
   }, []);
-
-  // Notification tap deep-link handler (app already open / background)
-  // When the user taps a push notification, route them to the correct screen.
-  useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const data = response.notification.request.content.data as {
-          type?: string;
-          courseId?: string;
-          url?: string;
-        };
-
-        if (data.courseId) {
-          // e.g. course re-engagement notification → open course detail
-          router.push(`/course/${data.courseId}` as any);
-        } else if (data.url) {
-          // Generic deep-link payload from server-sent push
-          const parsed = Linking.parse(data.url);
-          if (parsed.path) router.push(`/${parsed.path}` as any);
-        }
-      }
-    );
-    return () => subscription.remove();
-  }, [router]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -214,27 +168,26 @@ function RootLayoutContent() {
   }, []);
 
   useEffect(() => {
+    if (pathname) {
+      const screenName = pathname === '/' ? 'Home' : pathname.replace(/^\//, '').replace(/\//g, '_');
+      trackScreenView(screenName);
+      clarityService.setScreen(screenName);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     if (!isReady || isAuthLoading || !isUnlocked) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
-    if (!isAuthenticated) {
-      if (!inAuthGroup) {
-        router.replace('/(auth)/login' as any);
+    if (!isAuthenticated && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (isAuthenticated && inAuthGroup) {
+      // Fresh login (wasn't authenticated on app init) - show welcome
+      if (!wasAuthenticatedOnInit) {
+        setShowWelcome(true);
       }
-    } else {
-      // User is authenticated
-      const user = useAuthStore.getState().user;
-      
-      if (user?.role === 'admin' && !user.schoolId) {
-        // Admin must create a school
-        if (segments[1] !== ('school-register' as any)) {
-          router.replace('/(auth)/school-register' as any);
-        }
-      } else if (inAuthGroup) {
-        // Authenticated users shouldn't be in auth screens
-        router.replace('/(tabs)' as any);
-      }
+      router.replace('/(tabs)');
     }
   }, [isAuthenticated, isReady, isAuthLoading, isUnlocked, segments]);
 
@@ -249,6 +202,12 @@ function RootLayoutContent() {
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <View style={{ flex: 1, backgroundColor: bgColor }}>
+        {showWelcome && (
+          <WelcomeScreen
+            username={useAuthStore.getState().user?.username || 'Explorer'}
+            onComplete={() => setShowWelcome(false)}
+          />
+        )}
         <CustomDialog
         visible={dialogConfig.visible}
         title={dialogConfig.title}
@@ -277,42 +236,36 @@ function RootLayoutContent() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="course/[id]/index" />
         <Stack.Screen name="course/[id]/content" />
-        <Stack.Screen name="schools/index" />
-        <Stack.Screen name="schools/[schoolSlug]" />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       </View>
     </ThemeProvider>
   );
-} 
+}
 
 
 export default Sentry.wrap(function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <View
-          style={{
-            flex: 1,
-            maxWidth: Platform.OS === 'web' ? 480 : undefined,
-            width: '100%',
-            alignSelf: 'center',
-            overflow: 'hidden',
-            ...(Platform.OS === 'web'
-              ? {
-                  boxShadow: '0 0 20px rgba(0,0,0,0.05)',
-                  borderLeftWidth: 1,
-                  borderRightWidth: 1,
-                  borderColor: '#e2e8f0',
-                }
-              : {}),
-          }}
-        >
-          <ErrorBoundary>
-            <RootLayoutContent />
-          </ErrorBoundary>
-        </View>
-      </GestureHandlerRootView>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View 
+        style={{ 
+          flex: 1, 
+          maxWidth: Platform.OS === 'web' ? 480 : undefined, 
+          width: '100%', 
+          alignSelf: 'center', 
+          overflow: 'hidden',
+          ...(Platform.OS === 'web' ? {
+            boxShadow: '0 0 20px rgba(0,0,0,0.05)',
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderColor: '#e2e8f0',
+          } : {})
+        }}
+      >
+        <ErrorBoundary>
+          <RootLayoutContent />
+        </ErrorBoundary>
+      </View>
+    </GestureHandlerRootView>
   );
 });

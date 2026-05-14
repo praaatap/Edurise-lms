@@ -3,7 +3,6 @@ import { useTheme } from '@/core/theme/useTheme';
 import { CourseCard } from '@/features/courses/components/CourseCard';
 import { SearchBar } from '@/features/courses/components/SearchBar';
 import { useCourseStore } from '@/features/courses/store/courseStore';
-import { coursesApi } from '@/features/courses/api/coursesApi';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
 import { Course } from '@/shared/types';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
@@ -11,11 +10,13 @@ import { LegendList } from '@legendapp/list';
 import * as Haptics from 'expo-haptics';
 import { Href, useRouter } from 'expo-router';
 import { Code, SlidersHorizontal, X } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
-
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+import { clarityService } from '@/core/services/clarityService';
 const CATEGORIES = [
   'All',
   'Web Dev',
@@ -26,94 +27,70 @@ const CATEGORIES = [
   'Data Science',
 ];
 
+
+
 const LEVELS = ['All', 'Beginner', 'Intermediate', 'Advanced'];
 const PRICE_RANGES = ['All', 'Free', 'Paid'];
-
-const SORT_TO_PARAM: Record<string, string> = {
-  'Newest': 'createdAt:desc',
-  'Price: Low to High': 'price:asc',
-  'Price: High to Low': 'price:desc',
-  'Highest Rated': 'rating:desc',
-};
 
 function useExploreLogic() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { bookmarks, toggleBookmark } = useCourseStore();
-
-  const [results, setResults] = useState<Course[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { courses, searchQuery, searchCourses, bookmarks, toggleBookmark, aiRecommendedIds, refreshCourses, isLoading } = useCourseStore();
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  useScreenTracking('Explore');
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [selectedPrice, setSelectedPrice] = useState('All');
   const [sortBy, setSortBy] = useState('Newest');
 
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchResults = useCallback(async (params: {
-    search?: string;
-    category?: string;
-    difficulty?: string;
-    sort?: string;
-  }) => {
-    setIsLoading(true);
-    try {
-      const query: Record<string, string> = { limit: '50' };
-      if (params.search) query.search = params.search;
-      if (params.category && params.category !== 'All') query.category = params.category;
-      if (params.difficulty && params.difficulty !== 'All') query.difficulty = params.difficulty.toUpperCase();
-      if (params.sort) query.sort = params.sort;
-
-      const courses = await coursesApi.fetchCourses(query as any);
-
-      // Client-side price filter (backend doesn't have it)
-      const priceFilter = selectedPrice;
-      const filtered = courses.filter(c => {
-        if (priceFilter === 'Free') return c.price === 0;
-        if (priceFilter === 'Paid') return c.price > 0;
-        return true;
-      });
-
-      setResults(filtered);
-    } catch {
-      setResults([]);
-    } finally {
-      setIsLoading(false);
+  const filteredCourses = useMemo(() => {
+    if (aiRecommendedIds.length > 0) {
+      return courses.filter((c) => aiRecommendedIds.includes(c.id));
     }
-  }, [selectedPrice]);
 
-  // Fetch when filters change
-  useEffect(() => {
-    fetchResults({
-      search: searchQuery,
-      category: selectedCategory,
-      difficulty: selectedLevel,
-      sort: SORT_TO_PARAM[sortBy],
+    return courses.filter((course) => {
+      const matchesSearch =
+        !searchQuery ||
+        course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        course.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesCategory =
+        selectedCategory === 'All' || course.category === selectedCategory;
+
+      const matchesLevel =
+        selectedLevel === 'All' || course.level === selectedLevel;
+
+      const matchesPrice =
+        selectedPrice === 'All' ||
+        (selectedPrice === 'Free' ? course.price === 0 : course.price > 0);
+
+      return matchesSearch && matchesCategory && matchesLevel && matchesPrice;
+    }).sort((a, b) => {
+      if (sortBy === 'Price: Low to High') return a.price - b.price;
+      if (sortBy === 'Price: High to Low') return b.price - a.price;
+      if (sortBy === 'Highest Rated') return b.rating - a.rating;
+      return 0; // Default: Newest (assuming data order is newest)
     });
-  }, [selectedCategory, selectedLevel, sortBy]);
+  }, [courses, searchQuery, selectedCategory, selectedLevel, selectedPrice, aiRecommendedIds, sortBy]);
 
   const handleSearch = useCallback((text: string) => {
-    setSearchQuery(text);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      fetchResults({
-        search: text,
-        category: selectedCategory,
-        difficulty: selectedLevel,
-        sort: SORT_TO_PARAM[sortBy],
-      });
-      if (text.length > 2) analytics.logEvent('search_performed', { query: text });
-    }, 400);
-  }, [selectedCategory, selectedLevel, sortBy, fetchResults]);
+    searchCourses(text);
+    if (text.length > 2) {
+      trackUserAction('search', { query: text });
+      clarityService.logEvent('course_searched', { query: text });
+      analytics.logEvent('search_performed', { query: text });
+    }
+  }, [searchCourses]);
 
   const handleCategoryPress = useCallback((category: string) => {
     setSelectedCategory(category);
     Haptics.selectionAsync();
+    analytics.logEvent('filter_category_selected', { category });
   }, []);
 
   const handleCoursePress = useCallback((course: Course) => {
+    analytics.logEvent('course_tapped', { courseId: course.id, title: course.title, source: 'explore' });
     router.push(`/course/${course.id}` as Href);
   }, [router]);
 
@@ -121,24 +98,19 @@ function useExploreLogic() {
     setSelectedLevel('All');
     setSelectedPrice('All');
     setSelectedCategory('All');
-    setSearchQuery('');
-    setSortBy('Newest');
-  }, []);
+    searchCourses('');
+    analytics.logEvent('filter_reset');
+  }, [searchCourses]);
 
   const handleRefresh = useCallback(async () => {
-    await fetchResults({
-      search: searchQuery,
-      category: selectedCategory,
-      difficulty: selectedLevel,
-      sort: SORT_TO_PARAM[sortBy],
-    });
-  }, [fetchResults, searchQuery, selectedCategory, selectedLevel, sortBy]);
+    await refreshCourses();
+  }, [refreshCourses]);
 
   const listPaddingHorizontal = width > 600 ? (width - 600) / 2 : 16;
 
   return {
     insets,
-    filteredCourses: results,
+    filteredCourses,
     searchQuery,
     bookmarks,
     toggleBookmark,
@@ -153,7 +125,7 @@ function useExploreLogic() {
     resetFilters,
     sortBy,
     setSortBy,
-    aiRecommendedIds: [] as string[],
+    aiRecommendedIds,
     handleRefresh,
     isLoading,
     listPaddingHorizontal,
@@ -213,7 +185,7 @@ export default function TechExploreScreen() {
         </View>
         <TouchableOpacity
           className="bg-primary/10 w-12 h-12 rounded-2xl items-center justify-center border border-primary/20"
-          onPress={() => bottomSheetRef.current?.expand()}
+          onPress={() => { analytics.logEvent('filter_sheet_opened'); bottomSheetRef.current?.expand(); }}
         >
           <SlidersHorizontal size={22} color={Colors.primary} />
           {(selectedLevel !== 'All' || selectedPrice !== 'All') && (
@@ -328,6 +300,7 @@ export default function TechExploreScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setSelectedLevel(level);
+                  analytics.logEvent('filter_level_selected', { level });
                 }}
                 style={{
                   backgroundColor: selectedLevel === level ? Colors.primary : C.surfaceElevated,
@@ -348,6 +321,7 @@ export default function TechExploreScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setSelectedPrice(range);
+                  analytics.logEvent('filter_price_selected', { price: range });
                 }}
                 style={{
                   backgroundColor: selectedPrice === range ? Colors.primary : C.surfaceElevated,
@@ -368,6 +342,7 @@ export default function TechExploreScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setSortBy(option);
+                  analytics.logEvent('filter_sort_applied', { sortBy: option });
                 }}
                 style={{
                   backgroundColor: sortBy === option ? Colors.primary : C.surfaceElevated,
@@ -382,7 +357,12 @@ export default function TechExploreScreen() {
 
           <TouchableOpacity
             className="bg-primary w-full py-4 rounded-2xl items-center justify-center shadow-lg"
-            onPress={() => bottomSheetRef.current?.close()}
+            onPress={() => {
+              trackUserAction('filters_applied', { level: selectedLevel, price: selectedPrice, sortBy });
+              clarityService.logEvent('course_filter_applied', { level: selectedLevel, price: selectedPrice });
+              analytics.logEvent('filter_applied', { level: selectedLevel, price: selectedPrice, sortBy });
+              bottomSheetRef.current?.close();
+            }}
           >
             <Text className="text-white text-lg font-bold">Apply Filters</Text>
           </TouchableOpacity>

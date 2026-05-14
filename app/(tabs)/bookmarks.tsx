@@ -12,6 +12,9 @@ import { Bookmark, Share2, Trash2, Video } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Share, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { analytics } from '@/core/services/analyticsService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 
 export default function BookmarksScreen() {
   const router = useRouter();
@@ -19,6 +22,8 @@ export default function BookmarksScreen() {
   const { width } = useWindowDimensions();
   const { courses, bookmarks, toggleBookmark, enrollCourse, refreshCourses, isLoading } = useCourseStore();
   const { C, isDark } = useTheme();
+
+  useScreenTracking('Bookmarks');
 
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -30,11 +35,13 @@ export default function BookmarksScreen() {
   );
 
   const handleCoursePress = useCallback((course: Course) => {
+    analytics.logEvent('course_tapped', { courseId: course.id, title: course.title, source: 'bookmarks' });
     router.push(`/course/${course.id}` as Href);
   }, [router]);
 
   const handleLongPress = useCallback((course: Course) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    analytics.logEvent('bookmarks_course_long_pressed', { courseId: course.id, title: course.title });
     setSelectedCourse(course);
     bottomSheetRef.current?.expand();
   }, []);
@@ -46,8 +53,12 @@ export default function BookmarksScreen() {
     setTimeout(async () => {
       if (action === 'delete') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        trackUserAction('bookmark_removed', { courseId: selectedCourse.id });
+        analytics.logEvent('bookmarks_course_removed', { courseId: selectedCourse.id, title: selectedCourse.title });
         toggleBookmark(selectedCourse.id);
       } else if (action === 'share') {
+        trackUserAction('bookmark_shared', { courseId: selectedCourse.id });
+        analytics.logEvent('bookmarks_course_shared', { courseId: selectedCourse.id, title: selectedCourse.title });
         await Share.share({
           message: `Check out this awesome course on Edurise LMS: ${selectedCourse.title}`,
         });
@@ -98,7 +109,7 @@ export default function BookmarksScreen() {
           title="No Bookmarks Yet"
           message="Save courses you're interested in and they'll appear here for easy access."
           actionTitle="Explore Courses"
-          onAction={() => router.push('/(tabs)' as Href)}
+          onAction={() => { analytics.logEvent('bookmarks_explore_tapped'); router.push('/(tabs)' as Href); }}
         />
       </View>
     );

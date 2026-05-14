@@ -1,4 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+import { clarityService } from '@/core/services/clarityService';
 import {
   View,
   Text,
@@ -6,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  StyleSheet,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -18,8 +19,7 @@ import { Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import { useTheme } from '@/core/theme/useTheme';
 import { CustomDialog } from '@/shared/components/ui/CustomDialog';
-import { User, Mail, Lock, BookOpen, GraduationCap, Building2 } from 'lucide-react-native';
-import { Colors } from '@/core/theme/colors';
+import { User, Mail, Lock, BookOpen } from 'lucide-react-native';
 
 const registerSchema = z.object({
   username: z
@@ -34,8 +34,6 @@ const registerSchema = z.object({
     .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
     .regex(/[0-9]/, 'Must contain at least one number'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
-  role: z.enum(['student', 'teacher', 'admin']),
-  schoolCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -43,6 +41,7 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
+// Cached hero image via expo-image
 const HERO_URI = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80';
 
 export default function RegisterScreen() {
@@ -51,20 +50,24 @@ export default function RegisterScreen() {
   const { C, isDark } = useTheme();
   const [dialogConfig, setDialogConfig] = useState({ visible: false, title: '', message: '' });
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<RegisterFormValues>({
+  useScreenTracking('Register');
+
+  // Pause Clarity recording on register screen — password field must not be recorded
+  useEffect(() => {
+    clarityService.pauseRecording();
+    return () => clarityService.resumeRecording();
+  }, []);
+
+  const { control, handleSubmit, formState: { errors } } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       username: '',
       email: '',
       password: '',
       confirmPassword: '',
-      role: 'student',
-      schoolCode: '',
     },
-    mode: 'onBlur',
+    mode: 'onBlur', // validate on blur for better UX
   });
-
-  const selectedRole = watch('role');
 
   const onSubmit = useCallback(async (data: RegisterFormValues) => {
     try {
@@ -72,40 +75,13 @@ export default function RegisterScreen() {
         username: data.username,
         email: data.email,
         password: data.password,
-        role: data.role.toUpperCase(),
+        role: 'USER',
       });
-      
-      // Continue to school registration if role is admin
-      if (data.role === 'admin') {
-        router.push('/(auth)/school-register' as any);
-      } else {
-        router.replace('/(tabs)' as any);
-      }
     } catch (error: any) {
       const message = error.response?.data?.message || 'Registration failed. Try a different email.';
       setDialogConfig({ visible: true, title: 'Registration Failed', message });
     }
   }, [register]);
-
-  const renderRoleOption = (role: 'student' | 'teacher' | 'admin', label: string, Icon: any) => {
-    const isSelected = selectedRole === role;
-    return (
-      <TouchableOpacity
-        style={[
-          styles.roleOption,
-          { 
-            backgroundColor: isSelected ? Colors.primary + '15' : C.surface,
-            borderColor: isSelected ? Colors.primary : C.border 
-          }
-        ]}
-        onPress={() => setValue('role', role)}
-        activeOpacity={0.7}
-      >
-        <Icon size={20} color={isSelected ? Colors.primary : C.textMuted} />
-        <Text style={[styles.roleLabel, { color: isSelected ? Colors.primary : C.text }]}>{label}</Text>
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <KeyboardAvoidingView
@@ -127,7 +103,8 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ flexGrow: 1 }}
       >
-        <View className="h-40 w-full relative">
+        {/* Hero Image */}
+        <View className="h-48 w-full relative">
           <Image
             source={HERO_URI}
             style={{ width: '100%', height: '100%' }}
@@ -139,7 +116,7 @@ export default function RegisterScreen() {
             className="absolute inset-0"
             style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.35)' }}
           />
-          <View className="absolute bottom-4 left-6 flex-row items-center">
+          <View className="absolute bottom-6 left-6 flex-row items-center">
             <View className="w-10 h-10 rounded-xl bg-primary items-center justify-center mr-3">
               <BookOpen size={22} color="white" />
             </View>
@@ -147,23 +124,17 @@ export default function RegisterScreen() {
           </View>
         </View>
 
+        {/* Form card */}
         <View
-          className="flex-1 rounded-t-3xl -mt-6 px-6 pt-6 pb-10"
+          className="flex-1 rounded-t-3xl -mt-6 px-6 pt-8 pb-10"
           style={{ backgroundColor: C.background }}
         >
-          <Text style={{ color: C.text }} className="text-2xl font-extrabold tracking-tight mb-1">
-            Join the Community!
+          <Text style={{ color: C.text }} className="text-3xl font-extrabold tracking-tight mb-1">
+            Create Account ✨
           </Text>
-          <Text style={{ color: C.textMuted }} className="text-sm font-medium mb-6">
-            Choose your role and start your journey 🔐
+          <Text style={{ color: C.textMuted }} className="text-base font-medium mb-7">
+            Join thousands of learners worldwide
           </Text>
-
-          {/* Role Selector */}
-          <View style={styles.roleContainer}>
-            {renderRoleOption('student', 'Student', User)}
-            {renderRoleOption('teacher', 'Teacher', GraduationCap)}
-            {renderRoleOption('admin', 'School Admin', Building2)}
-          </View>
 
           <Controller
             control={control}
@@ -177,6 +148,8 @@ export default function RegisterScreen() {
                 value={value}
                 error={errors.username?.message}
                 autoCapitalize="none"
+                autoComplete="username"
+                hint="Letters, numbers and underscores only"
                 leftIcon={<User size={18} color={C.textMuted} />}
               />
             )}
@@ -195,6 +168,7 @@ export default function RegisterScreen() {
                 error={errors.email?.message}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
                 leftIcon={<Mail size={18} color={C.textMuted} />}
               />
             )}
@@ -206,7 +180,7 @@ export default function RegisterScreen() {
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
                 label="Password"
-                placeholder="••••••••"
+                placeholder="Min 6 chars, 1 uppercase, 1 number"
                 onBlur={onBlur}
                 onChangeText={onChange}
                 value={value}
@@ -223,7 +197,7 @@ export default function RegisterScreen() {
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
                 label="Confirm Password"
-                placeholder="••••••••"
+                placeholder="Re-enter your password"
                 onBlur={onBlur}
                 onChangeText={onChange}
                 value={value}
@@ -234,36 +208,16 @@ export default function RegisterScreen() {
             )}
           />
 
-          {selectedRole === 'student' && (
-            <Controller
-              control={control}
-              name="schoolCode"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input
-                  label="School Code (Optional)"
-                  placeholder="e.g. SCH-1234"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  error={errors.schoolCode?.message}
-                  autoCapitalize="characters"
-                  leftIcon={<Building2 size={18} color={C.textMuted} />}
-                  hint="Join your school directly with a code"
-                />
-              )}
-            />
-          )}
-
-          <View className="mt-4">
+          <View className="mt-2">
             <Button
-              title={selectedRole === 'admin' ? 'Create School Profile' : 'Join Now'}
+              title="Create Account"
               onPress={handleSubmit(onSubmit)}
               isLoading={isLoading}
               className="h-14 rounded-2xl shadow-sm"
             />
           </View>
 
-          <View className="flex-row justify-center items-center mt-6">
+          <View className="flex-row justify-center items-center mt-8">
             <Text style={{ color: C.textMuted }} className="text-base">
               Already have an account?{' '}
             </Text>
@@ -276,23 +230,3 @@ export default function RegisterScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  roleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-  },
-  roleOption: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    gap: 6,
-  },
-  roleLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-});

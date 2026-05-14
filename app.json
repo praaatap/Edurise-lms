@@ -55,6 +55,18 @@
           "project": "react-native",
           "organization": "praaatap"
         }
+      ],
+      [
+        "expo-alternate-app-icons",
+        {
+          "icons": {
+            "dark": "./assets/images/app-icons/icon-dark.png",
+            "green": "./assets/images/app-icons/icon-green.png",
+            "blue": "./assets/images/app-icons/icon-blue.png",
+            "purple": "./assets/images/app-icons/icon-purple.png",
+            "minimal": "./assets/images/app-icons/icon-minimal.png"
+          }
+        }
       ]
     ],
     "experiments": {

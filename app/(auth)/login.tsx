@@ -3,7 +3,9 @@ import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+import { clarityService } from '@/core/services/clarityService';
 import { Controller, useForm } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
@@ -34,7 +36,15 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, isLoading } = useAuthStore();
   const { C, isDark } = useTheme();
+
+  useScreenTracking('Login');
   const [dialogConfig, setDialogConfig] = useState({ visible: false, title: '', message: '' });
+
+  // Pause Clarity recording on login screen — password field must not be recorded
+  useEffect(() => {
+    clarityService.pauseRecording();
+    return () => clarityService.resumeRecording();
+  }, []);
 
   const { control, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
