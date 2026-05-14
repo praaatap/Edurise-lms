@@ -13,8 +13,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { CustomDialog } from '@/shared/components/ui/CustomDialog';
 import { analytics } from '@/core/services/analyticsService';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { UnsplashPicker } from '@/shared/components/ui/UnsplashPicker';
 
 import { ProfileHeader } from '@/features/auth/components/Profile/ProfileHeader';
@@ -36,6 +38,7 @@ export default function ProfileScreen() {
   const { colorScheme, setColorScheme } = useColorScheme();
   const { C, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{
@@ -53,6 +56,8 @@ export default function ProfileScreen() {
   const xp = user?.xp || 0;
   const xpToNextLevel = level * 1000;
   const xpProgress = Math.min(100, (xp / xpToNextLevel) * 100);
+
+  useScreenTracking('Profile');
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -89,7 +94,10 @@ export default function ProfileScreen() {
     setDialogConfig({
       visible: true, title: 'Sign Out',
       message: 'Are you sure you want to sign out? Your learning progress is saved!',
-      confirmText: 'Sign Out', type: 'destructive', onConfirm: logout,
+      confirmText: 'Sign Out', type: 'destructive', onConfirm: () => {
+        analytics.logEvent('profile_logout');
+        logout();
+      },
     });
   };
 
@@ -231,11 +239,22 @@ export default function ProfileScreen() {
             <View style={{ height: 1, backgroundColor: isDark ? Colors.dark.border : '#f1f5f9', marginHorizontal: 16 }} />
 
             {/* Notifications */}
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }} activeOpacity={0.7}>
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }} activeOpacity={0.7} onPress={() => { router.push('/profile/notifications'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
               <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(249,115,22,0.15)' : '#fff7ed', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
                 <Ionicons name="notifications" size={18} color="#f97316" />
               </View>
               <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '600' }}>Notifications</Text>
+              <Ionicons name="chevron-forward" size={18} color={C.textMuted} />
+            </TouchableOpacity>
+
+            <View style={{ height: 1, backgroundColor: isDark ? Colors.dark.border : '#f1f5f9', marginHorizontal: 16 }} />
+
+            {/* Send Notification */}
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }} activeOpacity={0.7} onPress={() => { router.push('/profile/send-notification' as any); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                <Ionicons name="send" size={18} color="#6366f1" />
+              </View>
+              <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '600' }}>Send Notification</Text>
               <Ionicons name="chevron-forward" size={18} color={C.textMuted} />
             </TouchableOpacity>
 
@@ -252,6 +271,17 @@ export default function ProfileScreen() {
 
             <View style={{ height: 1, backgroundColor: isDark ? Colors.dark.border : '#f1f5f9', marginHorizontal: 16 }} />
 
+            {/* App Icon */}
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }} activeOpacity={0.7} onPress={() => { router.push('/profile/app-icon'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(34,197,94,0.15)' : '#dcfce7', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                <Ionicons name="apps" size={18} color="#22c55e" />
+              </View>
+              <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '600' }}>App Icon</Text>
+              <Ionicons name="chevron-forward" size={18} color={C.textMuted} />
+            </TouchableOpacity>
+
+            <View style={{ height: 1, backgroundColor: isDark ? Colors.dark.border : '#f1f5f9', marginHorizontal: 16 }} />
+
             {/* Privacy */}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }} activeOpacity={0.7}>
               <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : '#fee2e2', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
@@ -263,8 +293,8 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Sentry test */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+        {/* Testing Buttons */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 16, gap: 10 }}>
           <TouchableOpacity
             style={{
               height: 52, borderRadius: 18,
@@ -279,6 +309,23 @@ export default function ProfileScreen() {
             activeOpacity={0.7}
           >
             <Text style={{ color: Colors.primary, fontSize: 14, fontWeight: '700' }}>Try Sentry Error</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              height: 52, borderRadius: 18,
+              backgroundColor: isDark ? 'rgba(245,158,11,0.1)' : '#fffbeb',
+              borderWidth: 1, borderColor: isDark ? 'rgba(245,158,11,0.25)' : '#fde68a',
+              alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8,
+            }}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/profile/event-testing' as any);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="flask" size={18} color="#F59E0B" />
+            <Text style={{ color: '#F59E0B', fontSize: 14, fontWeight: '700' }}>Event Testing Dashboard</Text>
           </TouchableOpacity>
         </View>
 

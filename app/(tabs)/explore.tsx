@@ -14,7 +14,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
-
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 const CATEGORIES = [
   'All',
   'Web Dev',
@@ -25,6 +26,8 @@ const CATEGORIES = [
   'Data Science',
 ];
 
+
+
 const LEVELS = ['All', 'Beginner', 'Intermediate', 'Advanced'];
 const PRICE_RANGES = ['All', 'Free', 'Paid'];
 
@@ -34,6 +37,8 @@ function useExploreLogic() {
   const { width } = useWindowDimensions();
   const { courses, searchQuery, searchCourses, bookmarks, toggleBookmark, aiRecommendedIds, refreshCourses, isLoading } = useCourseStore();
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  useScreenTracking('Explore');
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [selectedPrice, setSelectedPrice] = useState('All');
   const [sortBy, setSortBy] = useState('Newest');
@@ -71,6 +76,7 @@ function useExploreLogic() {
   const handleSearch = useCallback((text: string) => {
     searchCourses(text);
     if (text.length > 2) {
+      trackUserAction('search', { query: text });
       analytics.logEvent('search_performed', { query: text });
     }
   }, [searchCourses]);
@@ -78,9 +84,11 @@ function useExploreLogic() {
   const handleCategoryPress = useCallback((category: string) => {
     setSelectedCategory(category);
     Haptics.selectionAsync();
+    analytics.logEvent('filter_category_selected', { category });
   }, []);
 
   const handleCoursePress = useCallback((course: Course) => {
+    analytics.logEvent('course_tapped', { courseId: course.id, title: course.title, source: 'explore' });
     router.push(`/course/${course.id}` as Href);
   }, [router]);
 
@@ -89,6 +97,7 @@ function useExploreLogic() {
     setSelectedPrice('All');
     setSelectedCategory('All');
     searchCourses('');
+    analytics.logEvent('filter_reset');
   }, [searchCourses]);
 
   const handleRefresh = useCallback(async () => {
@@ -174,7 +183,7 @@ export default function TechExploreScreen() {
         </View>
         <TouchableOpacity
           className="bg-primary/10 w-12 h-12 rounded-2xl items-center justify-center border border-primary/20"
-          onPress={() => bottomSheetRef.current?.expand()}
+          onPress={() => { analytics.logEvent('filter_sheet_opened'); bottomSheetRef.current?.expand(); }}
         >
           <SlidersHorizontal size={22} color={Colors.primary} />
           {(selectedLevel !== 'All' || selectedPrice !== 'All') && (
@@ -289,6 +298,7 @@ export default function TechExploreScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setSelectedLevel(level);
+                  analytics.logEvent('filter_level_selected', { level });
                 }}
                 style={{
                   backgroundColor: selectedLevel === level ? Colors.primary : C.surfaceElevated,
@@ -309,6 +319,7 @@ export default function TechExploreScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setSelectedPrice(range);
+                  analytics.logEvent('filter_price_selected', { price: range });
                 }}
                 style={{
                   backgroundColor: selectedPrice === range ? Colors.primary : C.surfaceElevated,
@@ -329,6 +340,7 @@ export default function TechExploreScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setSortBy(option);
+                  analytics.logEvent('filter_sort_applied', { sortBy: option });
                 }}
                 style={{
                   backgroundColor: sortBy === option ? Colors.primary : C.surfaceElevated,
@@ -343,7 +355,11 @@ export default function TechExploreScreen() {
 
           <TouchableOpacity
             className="bg-primary w-full py-4 rounded-2xl items-center justify-center shadow-lg"
-            onPress={() => bottomSheetRef.current?.close()}
+            onPress={() => {
+              trackUserAction('filters_applied', { level: selectedLevel, price: selectedPrice, sortBy });
+              analytics.logEvent('filter_applied', { level: selectedLevel, price: selectedPrice, sortBy });
+              bottomSheetRef.current?.close();
+            }}
           >
             <Text className="text-white text-lg font-bold">Apply Filters</Text>
           </TouchableOpacity>

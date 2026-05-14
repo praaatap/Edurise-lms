@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import {
   View,
   Text,
@@ -47,6 +48,8 @@ export default function RegisterScreen() {
   const { register, isLoading } = useAuthStore();
   const { C, isDark } = useTheme();
   const [dialogConfig, setDialogConfig] = useState({ visible: false, title: '', message: '' });
+
+  useScreenTracking('Register');
 
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),

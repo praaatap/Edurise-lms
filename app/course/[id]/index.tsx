@@ -27,6 +27,8 @@ import { ScrollView, Share, StatusBar, Text, TouchableOpacity, View } from 'reac
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 
 // Extracted Components
 import { CourseHeader } from '@/features/courses/components/CourseDetail/CourseHeader';
@@ -62,13 +64,17 @@ export default function CourseDetailScreen() {
     type?: 'default' | 'destructive' | 'success';
   }>({ visible: false, title: '', message: '' });
 
+  const courseId = course?.id;
+  const courseTitle = course?.title;
   useEffect(() => {
     void clearCourseReminderNotification();
     return () => {
-      if (!course) return;
-      void scheduleCourseReengagementReminder(course.id, course.title, 60 * 60);
+      if (!courseId || !courseTitle) return;
+      void scheduleCourseReengagementReminder(courseId, courseTitle, 60 * 60);
     };
-  }, [course]);
+  }, [courseId, courseTitle]);
+
+  useScreenTracking(course ? `CourseDetail_${course.id}` : 'CourseDetail');
 
   useEffect(() => {
     if (course) {
@@ -84,6 +90,8 @@ export default function CourseDetailScreen() {
   const handleShare = useCallback(async () => {
     if (!course) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    trackUserAction('course_shared', { courseId: course.id });
+    analytics.logEvent('course_detail_shared', { courseId: course.id, title: course.title });
     await Share.share({
       message: `Master ${course.title} on Edurise LMS! Check it out: edurise://course/${course.id}`,
     });
@@ -91,8 +99,9 @@ export default function CourseDetailScreen() {
 
   const handleMainActionPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    analytics.logEvent('course_detail_enroll_sheet_opened', { courseId: id as string, isEnrolled });
     bottomSheetRef.current?.expand();
-  }, []);
+  }, [id, isEnrolled]);
 
   const confirmEnrollment = useCallback(async () => {
     const isAuthed = await authenticateBiometric(`Enroll in ${course?.title}`);
@@ -101,6 +110,7 @@ export default function CourseDetailScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    trackUserAction('course_enrolled', { courseId: id as string });
     btnScale.value = withSequence(withSpring(0.95), withSpring(1.05), withSpring(1));
     enrollCourse(id as string);
     bottomSheetRef.current?.close();
@@ -108,14 +118,17 @@ export default function CourseDetailScreen() {
 
   const handleUnenroll = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    trackUserAction('course_unenrolled', { courseId: id as string });
+    analytics.logEvent('course_detail_unenrolled', { courseId: id as string, title: course?.title });
     unenrollCourse(id as string);
     bottomSheetRef.current?.close();
-  }, [id, unenrollCourse]);
+  }, [id, unenrollCourse, course]);
 
   const handleGoAhead = useCallback(() => {
+    analytics.logEvent('course_detail_content_started', { courseId: id as string, title: course?.title });
     bottomSheetRef.current?.close();
     router.push(`/course/${id}/content` as any);
-  }, [id, router]);
+  }, [id, router, course]);
 
   if (!course) return null;
 
@@ -180,6 +193,7 @@ export default function CourseDetailScreen() {
                 onPress={() => {
                   Haptics.selectionAsync();
                   setActiveTab(tab);
+                  analytics.logEvent('course_detail_tab_switched', { courseId: id as string, tab });
                 }}
                 className={`mr-6 pb-3 ${activeTab === tab ? 'border-b-2 border-primary' : ''}`}
               >
@@ -214,7 +228,7 @@ export default function CourseDetailScreen() {
                 <Text className="text-[15px] text-text/70 dark:text-dark-text/70 leading-6" numberOfLines={isExpanded ? undefined : 4}>
                   {course.description}
                 </Text>
-                <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} className="mt-2 mb-6">
+                <TouchableOpacity onPress={() => { analytics.logEvent('course_detail_description_expanded', { courseId: id as string, expanded: !isExpanded }); setIsExpanded(!isExpanded); }} className="mt-2 mb-6">
                   <Text className="text-primary font-bold">{isExpanded ? 'Show Less' : 'Read Full Description'}</Text>
                 </TouchableOpacity>
 
@@ -239,6 +253,7 @@ export default function CourseDetailScreen() {
                     style={{ backgroundColor: C.surfaceElevated, borderColor: C.border }}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      analytics.logEvent('course_detail_download_all', { courseId: id as string, title: course?.title });
                       setDialogConfig({ visible: true, title: 'Download Started', message: 'The entire course is being prepared for offline use. You will be notified once it is ready.', confirmText: 'Awesome', type: 'success' });
                     }}
                   >
@@ -289,6 +304,7 @@ export default function CourseDetailScreen() {
                           style={{ backgroundColor: C.surfaceElevated, borderColor: C.border }}
                           onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            analytics.logEvent('course_detail_module_downloaded', { courseId: id as string, moduleTitle: module.title });
                             setDialogConfig({
                               visible: true,
                               title: 'Module Downloaded',
@@ -354,7 +370,7 @@ export default function CourseDetailScreen() {
                   </View>
                 ))}
                 
-                <TouchableOpacity className="w-full py-3 items-center rounded-xl border border-primary/30">
+                <TouchableOpacity className="w-full py-3 items-center rounded-xl border border-primary/30" onPress={() => analytics.logEvent('course_detail_see_all_reviews', { courseId: id as string })}>
                    <Text className="text-primary font-bold">See All Reviews</Text>
                 </TouchableOpacity>
               </Animated.View>
@@ -375,6 +391,7 @@ export default function CourseDetailScreen() {
             style={{ backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#EEF2FF', borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#C7D2FE' }}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              analytics.logEvent('course_detail_certificate_viewed', { courseId: id as string, title: course?.title });
               setIsCertificateVisible(true);
             }}
           >

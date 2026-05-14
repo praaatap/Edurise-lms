@@ -45,7 +45,7 @@ export function FloatingAIBtn() {
     >
       <TouchableOpacity
         className="w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg shadow-primary/40 border-2 border-white"
-        onPress={() => router.push('/ai-tutor')}
+        onPress={() => router.push('/ai-tutor' as any)}
         activeOpacity={0.8}
       >
         <BotMessageSquare size={26} color="white" />

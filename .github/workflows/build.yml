@@ -1,41 +1,116 @@
-name: Expo CI/CD
+name: Android Build & Release
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-release:
+    name: Build APK & Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: 🏗 Setup repo
-        uses: actions/checkout@v4
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
 
-      - name: 🏗 Setup Node
-        uses: actions/setup-node@v4
+      # ── Node + pnpm ─────────────────────────────────────────────────────────
+      - uses: pnpm/action-setup@v4
         with:
-          node-version: 18.x
-          cache: npm
+          version: 9
 
-      - name: 🏗 Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+      - uses: actions/setup-node@v4
         with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          node-version: 20
+          cache: pnpm
 
-      - name: 📦 Install dependencies
-        run: npm ci --legacy-peer-deps
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: 📝 Check linting
-        run: npm run lint
+      # ── Java 17 (required by React Native Gradle plugin) ────────────────────
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-      - name: 🧪 Run tests
-        run: npm run test -- --coverage
+      # ── Android SDK ─────────────────────────────────────────────────────────
+      - uses: android-actions/setup-android@v3
 
-      # (Optional) Build Android APK if triggered manually or on specific tag
-      # - name: 🚀 Build Android App
-      #   run: eas build -p android --profile preview --non-interactive
+      # ── Write .env so Expo can read EXPO_PUBLIC_* vars at bundle time ───────
+      - name: Write .env
+        run: |
+          cat > .env << 'EOF'
+          EXPO_PUBLIC_API_URL=${{ secrets.EXPO_PUBLIC_API_URL }}
+          EXPO_PUBLIC_GROQ_API_KEY=${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
+          EXPO_PUBLIC_SENTRY_DSN=${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+          EXPO_PUBLIC_CLARITY_PROJECT_ID=${{ secrets.EXPO_PUBLIC_CLARITY_PROJECT_ID }}
+          EOF
+
+      # ── Gradle cache (speeds up subsequent builds) ──────────────────────────
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle*') }}
+          restore-keys: gradle-
+
+      # ── Make gradlew executable ─────────────────────────────────────────────
+      - name: Fix gradlew permissions
+        run: chmod +x android/gradlew
+
+      # ── Build release APK ───────────────────────────────────────────────────
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        env:
+          JAVA_OPTS: "-Xmx4g"
+
+      # ── Rename APK with build number ────────────────────────────────────────
+      - name: Locate & rename APK
+        id: apk
+        run: |
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          VERSION=$(node -p "require('./package.json').version")
+          DEST="edurise-lms-v${VERSION}-build${{ github.run_number }}.apk"
+          cp "$APK" "$DEST"
+          echo "path=$DEST" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "✅ APK: $DEST ($(du -sh $DEST | cut -f1))"
+
+      # ── Upload as workflow artifact (always available) ──────────────────────
+      - uses: actions/upload-artifact@v4
+        with:
+          name: edurise-apk
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
+
+      # ── Create GitHub Release ───────────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.apk.outputs.version }}-build.${{ github.run_number }}
+          name: "Edurise LMS v${{ steps.apk.outputs.version }} (Build #${{ github.run_number }})"
+          body: |
+            ## 📱 Edurise LMS — Android APK
+
+            | | |
+            |---|---|
+            | **Version** | `${{ steps.apk.outputs.version }}` |
+            | **Build** | `#${{ github.run_number }}` |
+            | **Commit** | [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |
+            | **Branch** | `${{ github.ref_name }}` |
+
+            ### How to install
+            1. Download **`${{ steps.apk.outputs.path }}`** from assets below
+            2. On Android go to **Settings → Install unknown apps** and allow your browser/Files app
+            3. Open the APK and tap **Install**
+          files: ${{ steps.apk.outputs.path }}
+          draft: false
+          prerelease: false

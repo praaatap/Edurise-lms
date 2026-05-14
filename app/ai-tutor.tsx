@@ -2,6 +2,9 @@ import { Colors } from '@/core/theme/colors';
 import { useTheme } from '@/core/theme/useTheme';
 import { processUserMessage } from '@/features/ai/services/groqAgent';
 import { useAIStore } from '@/features/ai/store/aiStore';
+import { analytics } from '@/core/services/analyticsService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { LegendList } from '@legendapp/list';
 import { useRouter } from 'expo-router';
@@ -38,6 +41,12 @@ export default function AITutorScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { messages, isTyping } = useAIStore();
 
+  useScreenTracking('AITutor');
+
+  useEffect(() => {
+    analytics.logEvent('ai_chat_open');
+  }, []);
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0 && listRef.current) {
@@ -52,6 +61,7 @@ export default function AITutorScreen() {
     const hasText = !!text.trim();
     if (!hasText && !hasImage) return;
 
+    trackUserAction('ai_message_sent', { length: text.trim().length, hasImage });
     setInputText('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -172,7 +182,7 @@ export default function AITutorScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: C.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
       <View

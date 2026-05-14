@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '{print $NF}')",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js|jsx\\)$\")",
+      "Bash(pnpm add *)",
+      "Bash(npx tsc *)",
+      "Bash(cat node_modules/react-native-clarity/lib/index.d.ts)",
+      "Bash(cat node_modules/react-native-clarity/dist/index.d.ts)",
+      "Bash(cat node_modules/react-native-clarity/src/index.ts)",
+      "Bash(cat node_modules/react-native-clarity/src/index.tsx)",
+      "Bash(npx expo *)",
+      "Bash(npx ts-node *)",
+      "Bash(node scripts/verify-monitoring.js)"
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import 'text-encoding';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -26,6 +26,7 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import { CustomDialog } from '@/shared/components/ui/CustomDialog';
 import { AnimatedSplashScreen } from '@/shared/components/ui/AnimatedSplashScreen';
+import { WelcomeScreen } from '@/shared/components/ui/WelcomeScreen';
 import { Colors } from '@/core/theme/colors';
 import * as Linking from 'expo-linking';
 import { OfflineBanner } from '@/shared/components/ui/OfflineBanner';
@@ -36,15 +37,25 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import { useThemeStore } from '@/core/theme/themeStore';
 import { requestPermissions, scheduleReminderNotification } from '@/features/notifications/services/notificationService';
 import { analytics } from '@/core/services/analyticsService';
+import { useUpdates } from '@/shared/hooks/useUpdates';
+import { clarityService } from '@/core/services/clarityService';
+import { trackScreenView } from '@/core/services/sentryPerformance';
 
 // Initialize Sentry — only when a real DSN is provided via environment variable
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
-    debug: false,
+    debug: __DEV__,
     enableNative: true,
+    tracesSampleRate: __DEV__ ? 1.0 : 0.3,
+    profilesSampleRate: 0.5,
+    enableAutoPerformanceTracing: true,
+    integrations: [
+      Sentry.reactNativeTracingIntegration(),
+    ],
   });
+  if (__DEV__) console.log('[Sentry] Initialized with DSN:', SENTRY_DSN.slice(0, 30) + '...');
 }
 
 export const unstable_settings = {
@@ -56,12 +67,18 @@ function RootLayoutContent() {
   const { theme: storedTheme } = useThemeStore();
   const router = useRouter();
   const segments = useSegments();
+  const pathname = usePathname();
   const { isAuthenticated, checkAuth, isLoading: isAuthLoading } = useAuthStore();
   const [isReady, setIsReady] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSplashAnimationComplete, setIsSplashAnimationComplete] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [wasAuthenticatedOnInit, setWasAuthenticatedOnInit] = useState(false);
   const { isConnected } = useNetworkStatus();
   const [showOfflineScreen, setShowOfflineScreen] = useState(false);
+  
+  // EAS Updates
+  useUpdates();
 
   const [dialogConfig, setDialogConfig] = useState<{
     visible: boolean;
@@ -76,8 +93,9 @@ function RootLayoutContent() {
 
   useEffect(() => {
     const init = async () => {
-      // 0. Analytics & Linking init
+      // 0. Analytics, Clarity & Linking init
       await analytics.init();
+      clarityService.initialize();
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) {
 
@@ -85,6 +103,15 @@ function RootLayoutContent() {
 
       // 1. Auth check
       await checkAuth();
+
+      // Track if user was already authenticated on app launch
+      const authState = useAuthStore.getState();
+      setWasAuthenticatedOnInit(authState.isAuthenticated);
+
+      // Identify user in Clarity if already authenticated
+      if (authState.isAuthenticated && authState.user) {
+        clarityService.identifyUser(authState.user);
+      }
 
       // 2. Notification permissions
       const notificationsEnabled = await requestPermissions();
@@ -141,6 +168,14 @@ function RootLayoutContent() {
   }, []);
 
   useEffect(() => {
+    if (pathname) {
+      const screenName = pathname === '/' ? 'Home' : pathname.replace(/^\//, '').replace(/\//g, '_');
+      trackScreenView(screenName);
+      clarityService.setScreen(screenName);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     if (!isReady || isAuthLoading || !isUnlocked) return;
 
     const inAuthGroup = segments[0] === '(auth)';
@@ -148,6 +183,10 @@ function RootLayoutContent() {
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
+      // Fresh login (wasn't authenticated on app init) - show welcome
+      if (!wasAuthenticatedOnInit) {
+        setShowWelcome(true);
+      }
       router.replace('/(tabs)');
     }
   }, [isAuthenticated, isReady, isAuthLoading, isUnlocked, segments]);
@@ -163,6 +202,12 @@ function RootLayoutContent() {
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <View style={{ flex: 1, backgroundColor: bgColor }}>
+        {showWelcome && (
+          <WelcomeScreen
+            username={useAuthStore.getState().user?.username || 'Explorer'}
+            onComplete={() => setShowWelcome(false)}
+          />
+        )}
         <CustomDialog
         visible={dialogConfig.visible}
         title={dialogConfig.title}

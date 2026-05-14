@@ -42,7 +42,7 @@ describe('Groq Agent', () => {
     });
 
     const results = await smartSearch('I want to learn web dev');
-    
+
     expect(results).toEqual(['course_1', 'course_2']);
   });
 });

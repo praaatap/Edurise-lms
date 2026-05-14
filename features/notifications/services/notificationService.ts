@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { useNotificationPrefsStore } from "@/features/settings/store/notificationPrefsStore";
 
 const MILESTONE_KEY = "@bookmark_milestone_reached";
 const REMINDER_NOTIFICATION_ID_KEY = "@engagement_reminder_notification_id";
@@ -35,7 +36,24 @@ export async function requestPermissions() {
   return finalStatus === "granted";
 }
 
+export async function scheduleEnrollmentNotification(courseTitle: string) {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.courseUpdates) return;
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '🎓 Enrollment Confirmed!',
+      body: `You're now enrolled in "${courseTitle}". Let's start learning!`,
+      data: { type: 'ENROLLMENT' },
+    },
+    trigger: null, // fire immediately
+  });
+}
+
 export async function scheduleBookmarkMilestoneNotification() {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.achievements) return;
+
   const hasReached = await AsyncStorage.getItem(MILESTONE_KEY);
   if (!hasReached) {
     await Notifications.scheduleNotificationAsync({
@@ -50,6 +68,9 @@ export async function scheduleBookmarkMilestoneNotification() {
 }
 
 export async function scheduleReminderNotification() {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.reminders) return;
+
   const existingReminderId = await AsyncStorage.getItem(
     REMINDER_NOTIFICATION_ID_KEY,
   );
@@ -86,6 +107,8 @@ export async function scheduleCourseReengagementReminder(
   courseTitle: string,
   delaySeconds = 60 * 60,
 ) {
+  const prefs = useNotificationPrefsStore.getState();
+  if (!prefs.masterEnabled || !prefs.categories.engagement) return;
   const existing = await AsyncStorage.getItem(COURSE_REMINDER_NOTIFICATION_KEY);
   if (existing) {
     try {
@@ -134,5 +157,5 @@ export async function clearCourseReminderNotification() {
 
 export async function cancelAllNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
-  await AsyncStorage.removeItem(REMINDER_NOTIFICATION_ID_KEY);
+  await AsyncStorage.multiRemove([REMINDER_NOTIFICATION_ID_KEY, COURSE_REMINDER_NOTIFICATION_KEY]);
 }

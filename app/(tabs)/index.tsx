@@ -15,6 +15,9 @@ import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { analytics } from '@/core/services/analyticsService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 function useHomeLogic() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -38,6 +41,8 @@ function useHomeLogic() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  useScreenTracking('Home');
+
   useEffect(() => {
     const init = async () => {
       await fetchCourses();
@@ -49,6 +54,8 @@ function useHomeLogic() {
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
+    trackUserAction('home_refresh');
+    analytics.logEvent('home_refresh');
     await refreshCourses();
     updateStreak();
     getAIRecommendations(['Technology', 'Design', 'Development']);
@@ -56,6 +63,8 @@ function useHomeLogic() {
   }, [refreshCourses, getAIRecommendations]);
 
   const handleCoursePress = useCallback((course: Course) => {
+    trackUserAction('course_tapped', { courseId: course.id, source: 'home' });
+    analytics.logEvent('course_tapped', { courseId: course.id, title: course.title, source: 'home' });
     router.push(`/course/${course.id}` as Href);
   }, [router]);
 
@@ -206,7 +215,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={`inst-${idx}`}
                 className="items-center"
-                onPress={() => router.push(`/instructor/${inst.id}` as Href)}
+                onPress={() => { analytics.logEvent('home_instructor_tapped', { instructorId: inst.id, name: inst.name }); router.push(`/instructor/${inst.id}` as Href); }}
                 activeOpacity={0.8}
               >
                 <View
@@ -311,7 +320,7 @@ export default function HomeScreen() {
           <Text style={{ color: C.textMuted }} className="text-sm text-center leading-5 mb-8">{error}</Text>
           <TouchableOpacity
             className="bg-primary px-8 py-3.5 rounded-2xl shadow-sm"
-            onPress={() => refreshCourses()}
+            onPress={() => { analytics.logEvent('home_error_retry'); refreshCourses(); }}
             activeOpacity={0.8}
           >
             <Text className="text-white font-bold text-base">Try Again</Text>

@@ -12,6 +12,9 @@ import { CustomDialog } from '@/shared/components/ui/CustomDialog';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Pencil, TriangleAlert, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { analytics } from '@/core/services/analyticsService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -81,6 +84,8 @@ export default function CourseContentScreen() {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'COMPLETE_COURSE') {
         shouldScheduleReminderRef.current = false;
+        trackUserAction('content_completed', { courseId: id as string });
+        analytics.logEvent('course_content_completed', { courseId: id as string, title: course?.title });
         completeCourse(id as string);
         void clearCourseReminderNotification();
         setDialogConfig({
@@ -102,6 +107,8 @@ export default function CourseContentScreen() {
   const saveNote = () => {
     if (!noteText.trim()) return;
     addNote(id as string, noteText.trim());
+    trackUserAction('note_saved', { courseId: id as string });
+    analytics.logEvent('course_content_note_saved', { courseId: id as string, noteLength: noteText.trim().length });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setNoteText('');
     setIsNoteModalVisible(false);
@@ -114,6 +121,8 @@ export default function CourseContentScreen() {
       type: 'success'
     });
   };
+
+  useScreenTracking(course ? `CourseContent_${course.id}` : 'CourseContent');
 
   useEffect(() => {
     void clearCourseReminderNotification();
@@ -131,7 +140,7 @@ export default function CourseContentScreen() {
       <SafeAreaView className="flex-1" style={{ backgroundColor: C.surface }}>
         <OfflineBanner />
         <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-          <TouchableOpacity className="w-10 h-10 items-center justify-center" onPress={() => router.back()}>
+          <TouchableOpacity className="w-10 h-10 items-center justify-center" onPress={() => { analytics.logEvent('course_content_back', { courseId: id as string }); router.back(); }}>
             <ArrowLeft size={24} color={Colors.text} />
           </TouchableOpacity>
           <Text className="text-base font-bold text-text flex-1 text-center" numberOfLines={1}>{course.title}</Text>
@@ -145,6 +154,7 @@ export default function CourseContentScreen() {
           <TouchableOpacity
             className="mt-6 bg-primary rounded-xl px-5 py-3"
             onPress={() => {
+              analytics.logEvent('course_content_error_retry', { courseId: id as string });
               setWebViewError(null);
               webViewRef.current?.reload();
             }}
@@ -172,7 +182,7 @@ export default function CourseContentScreen() {
       />
       <OfflineBanner />
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-        <TouchableOpacity className="w-10 h-10 items-center justify-center" onPress={() => router.back()}>
+        <TouchableOpacity className="w-10 h-10 items-center justify-center" onPress={() => { analytics.logEvent('course_content_back', { courseId: id as string }); router.back(); }}>
           <ArrowLeft size={24} color={C.text} />
         </TouchableOpacity>
         <Text className="text-base font-bold text-text flex-1 text-center" numberOfLines={1}>{course.title}</Text>
@@ -184,9 +194,10 @@ export default function CourseContentScreen() {
       </View>
 
       <View className="flex-1">
+      {/* web view  */}
         <WebView
           ref={webViewRef}
-          source={{ html: htmlTemplate, baseUrl: 'https://mini-lms.local' }}
+          source={{ html: htmlTemplate, baseUrl: 'https://houseofedtech.com' }}
           className="flex-1"
           injectedJavaScriptBeforeContentLoaded={injectedJS}
           onLoadStart={() => {
@@ -204,7 +215,6 @@ export default function CourseContentScreen() {
           onLoadProgress={({ nativeEvent }) => setProgress(nativeEvent.progress)}
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={(request) => {
-            // Security: Prevent navigation to external sites inside this content viewer
             return request.url.startsWith('https://mini-lms.local');
           }}
           onMessage={handleMessage}
@@ -226,6 +236,7 @@ export default function CourseContentScreen() {
         activeOpacity={0.9}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          analytics.logEvent('course_content_note_opened', { courseId: id as string });
           setIsNoteModalVisible(true);
         }}
       >
@@ -247,7 +258,7 @@ export default function CourseContentScreen() {
             <View className="rounded-t-[40px] p-6 h-[70%]" style={{ backgroundColor: C.surface }}>
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-2xl font-extrabold text-text dark:text-dark-text">Quick Note</Text>
-                <TouchableOpacity onPress={() => setIsNoteModalVisible(false)} className="p-2 rounded-full" style={{ backgroundColor: C.surfaceElevated }}>
+                <TouchableOpacity onPress={() => { analytics.logEvent('course_content_note_discarded', { courseId: id as string }); setIsNoteModalVisible(false); }} className="p-2 rounded-full" style={{ backgroundColor: C.surfaceElevated }}>
                   <X size={20} color={C.text} />
                 </TouchableOpacity>
               </View>

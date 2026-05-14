@@ -1,12 +1,13 @@
 import { coursesApi } from "@/features/courses/api/coursesApi";
 import { aiService } from '@/features/courses/utils/ai';
-import { scheduleBookmarkMilestoneNotification } from '@/features/notifications/services/notificationService';
+import { scheduleBookmarkMilestoneNotification, scheduleEnrollmentNotification } from '@/features/notifications/services/notificationService';
 import { Course } from "@/shared/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from 'axios';
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { analytics } from "@/core/services/analyticsService";
+import { withSentrySpan, trackUserAction } from "@/core/services/sentryPerformance";
 
 interface TimelineEvent {
   id: string;
@@ -122,10 +123,14 @@ export const useCourseStore = create<CourseState>()(
 
         set({ isLoading: true, error: null });
         try {
-          const [instructors, products] = await Promise.all([
-            coursesApi.fetchInstructors(),
-            coursesApi.fetchProducts(),
-          ]);
+          const [instructors, products] = await withSentrySpan(
+            'fetch-courses',
+            'courses.fetch',
+            () => Promise.all([
+              coursesApi.fetchInstructors(),
+              coursesApi.fetchProducts(),
+            ]),
+          );
 
           const mergedCourses = coursesApi.mergeCourses(instructors, products);
 
@@ -146,7 +151,7 @@ export const useCourseStore = create<CourseState>()(
         if (courses.length === 0) return;
 
         try {
-          const recommended = await aiService.getRecommendedCourses(courses, interests);
+          const recommended = await withSentrySpan('ai-recommendations', 'ai.recommend', () => aiService.getRecommendedCourses(courses, interests));
           set({ recommendedCourses: recommended });
         } catch {
           // Silently fail — AI recommendations are non-critical
@@ -182,6 +187,7 @@ export const useCourseStore = create<CourseState>()(
         const { bookmarks, courses, addTimelineEvent } = get();
         let newBookmarks;
         const isBookmarked = bookmarks.includes(courseId);
+        trackUserAction('toggle_bookmark', { courseId, action: isBookmarked ? 'removed' : 'added' });
 
         if (isBookmarked) {
           newBookmarks = bookmarks.filter((id) => id !== courseId);
@@ -210,6 +216,7 @@ export const useCourseStore = create<CourseState>()(
 
       enrollCourse: (courseId: string) => {
         const { enrolledCourses, courses, addTimelineEvent } = get();
+        trackUserAction('enroll_course', { courseId });
         if (!enrolledCourses.includes(courseId)) {
           set({ enrolledCourses: [...enrolledCourses, courseId] });
           const course = courses.find((c) => c.id === courseId);
@@ -222,6 +229,7 @@ export const useCourseStore = create<CourseState>()(
             });
           }
           analytics.logEvent('course_enroll', { courseId });
+          scheduleEnrollmentNotification(course.title);
         }
       },
 
@@ -231,6 +239,7 @@ export const useCourseStore = create<CourseState>()(
           enrolledCourses: enrolledCourses.filter(id => id !== courseId),
           completedCourses: completedCourses.filter(id => id !== courseId)
         });
+        analytics.logEvent('course_unenroll', { courseId });
       },
 
       completeCourse: (courseId: string) => {
@@ -296,6 +305,7 @@ export const useCourseStore = create<CourseState>()(
             [courseId]: [note, ...courseNotes],
           },
         });
+        analytics.logEvent('course_note_added', { courseId, totalNotes: courseNotes.length + 1 });
       },
 
       updateStreak: () => {
@@ -315,9 +325,12 @@ export const useCourseStore = create<CourseState>()(
         const oneDay = 24 * 60 * 60 * 1000;
 
         if (diff === oneDay) {
-          set({ streak: streak + 1, lastStreakUpdate: today });
+          const newStreak = streak + 1;
+          set({ streak: newStreak, lastStreakUpdate: today });
+          analytics.logEvent('streak_updated', { streak: newStreak, action: 'extended' });
         } else if (diff > oneDay) {
           set({ streak: 1, lastStreakUpdate: today });
+          analytics.logEvent('streak_updated', { streak: 1, action: 'reset' });
         }
       },
 

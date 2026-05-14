@@ -5,6 +5,7 @@ import { useTheme } from '@/core/theme/useTheme';
 import { Colors } from '@/core/theme/colors';
 import { ArrowLeft, StickyNote, Calendar } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -13,6 +14,8 @@ export default function NotesScreen() {
   const { C } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  useScreenTracking('Notes');
 
   const allNotes = useMemo(() => {
     const result: { courseTitle: string; courseId: string; note: string; index: number }[] = [];

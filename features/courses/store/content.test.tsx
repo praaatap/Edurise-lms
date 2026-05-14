@@ -1,4 +1,4 @@
-import CourseContentScreen from '@/app/course/[id]/content';
+import CourseContentScreen from '@/app/(tabs)/profile/course/[id]/content';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { fireEvent, render } from '@testing-library/react-native';

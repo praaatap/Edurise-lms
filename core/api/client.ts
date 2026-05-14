@@ -1,7 +1,11 @@
 import NetInfo from "@react-native-community/netinfo";
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import * as SecureStore from "expo-secure-store";
+import * as Sentry from "@sentry/react-native";
 import { useAuthStore } from "@/features/auth/store/authStore";
+import { RetriableRequestConfig } from "./types";
+import { wait, getBackoffTime, isRetryableStatus } from "./utils";
+import { trackApiRequest } from "@/core/services/sentryPerformance";
 
 const ACCESS_TOKEN_KEY = "userToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
@@ -11,33 +15,10 @@ const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, "") ||
   "https://api.freeapi.app";
 
-type RetriableRequestConfig = InternalAxiosRequestConfig & {
-  _retryCount?: number;
-  _authRetry?: boolean;
-};
-
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: REQUEST_TIMEOUT_MS,
 });
-
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getBackoffTime(retryCount: number) {
-  return Math.pow(2, retryCount - 1) * 1000;
-}
-
-function isRetryableStatus(status?: number) {
-  return (
-    status === 429 ||
-    status === 500 ||
-    status === 502 ||
-    status === 503 ||
-    status === 504
-  );
-}
 
 async function refreshAccessToken() {
   const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
@@ -75,6 +56,30 @@ async function refreshAccessToken() {
   }
 }
 
+async function handleRetry(error: AxiosError, originalRequest: RetriableRequestConfig) {
+  const shouldRetry =
+    error.code === "ECONNABORTED" ||
+    !error.response ||
+    isRetryableStatus(error.response?.status);
+
+  if (shouldRetry) {
+    originalRequest._retryCount = originalRequest._retryCount || 0;
+
+    if (originalRequest._retryCount < MAX_RETRY_COUNT) {
+      originalRequest._retryCount += 1;
+      await wait(getBackoffTime(originalRequest._retryCount));
+      return apiClient(originalRequest);
+    }
+  }
+
+  if (error.code === "ECONNABORTED") {
+    return Promise.reject(new Error("TIMEOUT"));
+  }
+
+  return Promise.reject(error);
+}
+
+
 // Request Interceptor
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
@@ -82,6 +87,8 @@ apiClient.interceptors.request.use(
     if (!state.isConnected) {
       return Promise.reject(new Error("NO_INTERNET"));
     }
+
+    (config as any).metadata = { startTime: Date.now() };
 
     const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
     if (token && config.headers) {
@@ -96,15 +103,40 @@ apiClient.interceptors.request.use(
 
 // Response Interceptor
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const startTime = (response.config as any).metadata?.startTime;
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      trackApiRequest(
+        response.config.method || 'GET',
+        response.config.url || '',
+        response.status,
+        duration,
+      );
+    }
+    return response;
+  },
   async (error: AxiosError) => {
-    // 🔴 ENHANCED ERROR LOGGING
-    console.error('============ API ERROR ============');
-    console.error('URL:', error.config?.url);
-    console.error('Status:', error.response?.status);
-    console.error('Message:', error.message);
-    console.error('Response Data:', JSON.stringify(error.response?.data, null, 2));
-    console.error('===================================');
+    // Sentry breadcrumb for API errors
+    Sentry.addBreadcrumb({
+      category: 'http',
+      message: `${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status || error.message}`,
+      level: 'error',
+      data: {
+        status: error.response?.status,
+        url: error.config?.url,
+        method: error.config?.method,
+      },
+    });
+
+    if (__DEV__) {
+      console.error('============ API ERROR ============');
+      console.error('URL:', error.config?.url);
+      console.error('Status:', error.response?.status);
+      console.error('Message:', error.message);
+      console.error('Response Data:', JSON.stringify(error.response?.data, null, 2));
+      console.error('===================================');
+    }
 
     const originalRequest = error.config as RetriableRequestConfig | undefined;
 
@@ -138,25 +170,6 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const shouldRetry =
-      error.code === "ECONNABORTED" ||
-      !error.response ||
-      isRetryableStatus(error.response?.status);
-
-    if (shouldRetry) {
-      originalRequest._retryCount = originalRequest._retryCount || 0;
-
-      if (originalRequest._retryCount < MAX_RETRY_COUNT) {
-        originalRequest._retryCount += 1;
-        await wait(getBackoffTime(originalRequest._retryCount));
-        return apiClient(originalRequest);
-      }
-    }
-
-    if (error.code === "ECONNABORTED") {
-      return Promise.reject(new Error("TIMEOUT"));
-    }
-
-    return Promise.reject(error);
+    return handleRetry(error, originalRequest);
   },
 );

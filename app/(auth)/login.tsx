@@ -4,6 +4,7 @@ import { Input } from '@/shared/components/ui/Input';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { Controller, useForm } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
@@ -34,6 +35,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, isLoading } = useAuthStore();
   const { C, isDark } = useTheme();
+
+  useScreenTracking('Login');
   const [dialogConfig, setDialogConfig] = useState({ visible: false, title: '', message: '' });
 
   const { control, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({

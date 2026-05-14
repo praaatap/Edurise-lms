@@ -17,17 +17,21 @@ interface AIState {
   clearMessages: () => void;
 }
 
+
+const DEFAULT_MESSAGES: Message =
+{
+  id: 'welcome',
+  text: "Hi! I'm your AI Tutor. I can help you find courses, explain concepts, or plan your learning path. What would you like to learn today?",
+  sender: 'ai',
+  timestamp: new Date(),
+};
+
 export const useAIStore = create<AIState>((set) => ({
   messages: [
-    {
-      id: 'welcome',
-      text: "Hi! I'm your AI Tutor. I can help you find courses, explain concepts, or plan your learning path. What would you like to learn today?",
-      sender: 'ai',
-      timestamp: new Date(),
-    },
+    DEFAULT_MESSAGES
   ],
   isTyping: false,
-  
+
   addMessage: (msg) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(7);
     set((state) => ({
@@ -35,21 +39,16 @@ export const useAIStore = create<AIState>((set) => ({
     }));
     return id;
   },
-  
+
   appendMessageChunk: (id, chunk) => set((state) => ({
-    messages: state.messages.map((m) => 
+    messages: state.messages.map((m) =>
       m.id === id ? { ...m, text: m.text + chunk } : m
     )
   })),
-  
+
   setTyping: (isTyping) => set({ isTyping }),
-  
-  clearMessages: () => set({ 
-    messages: [{
-      id: 'welcome-reset',
-      text: "Hi! I'm your AI Tutor. Let's start fresh. How can I assist you?",
-      sender: 'ai',
-      timestamp: new Date(),
-    }]
+
+  clearMessages: () => set({
+    messages: [DEFAULT_MESSAGES]
   }),
 }));
