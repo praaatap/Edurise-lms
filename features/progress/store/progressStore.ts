@@ -40,7 +40,7 @@ export const useProgressStore = create<ProgressState>()(
         }
       },
 
-          markLessonComplete: (courseId, lessonId, score) => {
+      markLessonComplete: (courseId, lessonId, score) => {
         set((state) => {
           const progress = state.progressMap[courseId];
           if (!progress) return state;
