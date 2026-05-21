@@ -8,6 +8,11 @@
     "scheme": "edurise",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "statusBar": {
+      "barStyle": "auto",
+      "translucent": true,
+      "backgroundColor": "#00000000"
+    },
     "ios": {
       "supportsTablet": true
     },
