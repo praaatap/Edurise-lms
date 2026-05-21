@@ -8,17 +8,26 @@
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      },
       "prebuildCommand": "npx expo prebuild --clean --platform android"
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      },
       "prebuildCommand": "npx expo prebuild --clean --platform android"
     },
     "production": {
       "autoIncrement": true,
       "distribution": "internal",
       "channel": "production",
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      },
       "prebuildCommand": "npx expo prebuild --clean --platform android"
     },
     "apk": {
