@@ -7,8 +7,8 @@ module.exports = {
     "./core/**/*.{js,jsx,ts,tsx}",
   ],
   presets: [require("nativewind/preset")],
-  // NativeWind uses 'media' so dark: classes respond to the OS color scheme
-  darkMode: 'media',
+  // Required for the in-app theme switch to control NativeWind dark: classes.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

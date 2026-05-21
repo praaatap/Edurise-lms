@@ -243,7 +243,7 @@ export default function CourseContentScreen() {
       <View className="px-4 pt-4">
         <View className="flex-row items-center rounded-[28px] p-3 border" style={{ backgroundColor: C.surface, borderColor: C.border }}>
           <Image
-            source={{ uri: course.thumbnail }}
+            source={course.thumbnail}
             className="w-20 h-20 rounded-2xl mr-4"
             contentFit="cover"
             cachePolicy="memory-disk"
@@ -253,7 +253,7 @@ export default function CourseContentScreen() {
               {course.title}
             </Text>
             <Text className="mt-1 text-sm text-text-muted dark:text-dark-text-muted" numberOfLines={1}>
-              {course.instructor.name} • {course.category}
+              {course.instructor?.name || 'Instructor'} • {course.category || 'General'}
             </Text>
             <View className="flex-row items-center mt-3 gap-2">
               <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: C.surfaceElevated }}>

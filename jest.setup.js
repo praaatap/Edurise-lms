@@ -120,3 +120,21 @@ jest.mock('@sentry/react-native', () => ({
   setTag: jest.fn(),
   logEvent: jest.fn(),
 }));
+
+// React Native Clarity mock
+jest.mock('react-native-clarity', () => ({
+  initialize: jest.fn(),
+  logEvent: jest.fn(),
+  setCustomUserId: jest.fn(),
+  setCustomSessionId: jest.fn(),
+  setCurrentScreenName: jest.fn(),
+  LogLevel: {
+    Verbose: 0,
+    Debug: 1,
+    Info: 2,
+    Warning: 3,
+    Error: 4,
+    None: 5,
+  },
+}));
+

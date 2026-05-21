@@ -1,11 +1,11 @@
+import { trackApiRequest } from "@/core/services/sentryPerformance";
+import { useAuthStore } from "@/features/auth/store/authStore";
 import NetInfo from "@react-native-community/netinfo";
+import * as Sentry from "@sentry/react-native";
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import * as SecureStore from "expo-secure-store";
-import * as Sentry from "@sentry/react-native";
-import { useAuthStore } from "@/features/auth/store/authStore";
 import { RetriableRequestConfig } from "./types";
-import { wait, getBackoffTime, isRetryableStatus } from "./utils";
-import { trackApiRequest } from "@/core/services/sentryPerformance";
+import { getBackoffTime, isRetryableStatus, wait } from "./utils";
 
 const ACCESS_TOKEN_KEY = "userToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
@@ -129,7 +129,7 @@ apiClient.interceptors.response.use(
       },
     });
 
-    if (__DEV__) {
+    if (__DEV__ && process.env.LOG_API_ERRORS === 'true') {
       console.error('============ API ERROR ============');
       console.error('URL:', error.config?.url);
       console.error('Status:', error.response?.status);

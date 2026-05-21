@@ -86,7 +86,17 @@ export default function AppIconScreen() {
         className="px-4 pb-4 flex-row items-center justify-between"
         style={{ paddingTop: insets.top + 8, backgroundColor: 'transparent' }}
       >
-        <TouchableOpacity onPress={() => router.back()} className="w-11 h-11 items-center justify-center rounded-full" style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}>
+        <TouchableOpacity
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)');
+            }
+          }}
+          className="w-11 h-11 items-center justify-center rounded-full"
+          style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
+        >
           <ArrowLeft size={20} color={C.text} />
         </TouchableOpacity>
         <View className="items-center">
