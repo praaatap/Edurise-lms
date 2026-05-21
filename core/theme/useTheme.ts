@@ -1,20 +1,24 @@
-import { useColorScheme } from 'nativewind';
+import { useSchoolStore } from '@/features/school/store/schoolStore';
+import { useColorScheme } from 'react-native';
 import { Colors } from './colors';
 
 /**
  * useTheme – returns the correct set of Colors for the active color scheme.
  * Use this for **inline styles** where NativeWind dark: classes cannot reach.
  *
- * Example:
- *   const { C, isDark } = useTheme();
+ * Example:`
+ *   const { C } = useTheme();
  *   <View style={{ backgroundColor: C.surface }} />
  */
 export function useTheme() {
-  const { colorScheme } = useColorScheme();
+  const { colorScheme } = useColorScheme() as any;
+  const { activeSchool } = useSchoolStore();
   const isDark = colorScheme === 'dark';
 
+  const brandColor = activeSchool?.branding?.primaryColor || Colors.primary;
+
   const C = {
-    primary: Colors.primary,
+    primary: brandColor,
     primaryDark: Colors.primaryDark,
     accent: Colors.accent,
     error: Colors.error,

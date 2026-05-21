@@ -2,7 +2,7 @@
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![React Native](https://img.shields.io/badge/React_Native-Expo_SDK_51-61DAFB?logo=react&logoColor=white)
+![React Native](https://img.shields.io/badge/React_Native-Expo_SDK_54-61DAFB?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![Test Coverage](https://img.shields.io/badge/Coverage-82%25-success.svg)
 ![AI-Powered](https://img.shields.io/badge/AI-Llama_3.3_Groq-orange?logo=google-cloud&logoColor=white)
@@ -107,9 +107,16 @@ The project includes over 12 comprehensive test suites covering:
 ## 🏁 Setup & Installation
 
 ### Environment Variables
-Create a `.env` file:
+Create a `.env` file in the root directory:
 ```env
-EXPO_PUBLIC_GROQ_API_KEY=your_key_here
+# Required — API base URL (defaults to https://api.freeapi.app if omitted)
+EXPO_PUBLIC_API_URL=https://api.freeapi.app
+
+# Optional — AI Tutor (Groq LLaMA 3). App uses mock mode if omitted.
+EXPO_PUBLIC_GROQ_API_KEY=your_groq_api_key_here
+
+# Optional — Error monitoring via Sentry. Disabled if omitted.
+EXPO_PUBLIC_SENTRY_DSN=https://your_key@sentry.io/your_project_id
 ```
 
 ### Installation
@@ -133,3 +140,4 @@ eas build -p android --profile production
 ---
 
 Built with precision by **Antigravity AI**.
+`
