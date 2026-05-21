@@ -112,9 +112,10 @@ iconNames.forEach(name => {
 // Check Android activity-alias entries in manifest
 const manifest = readFile('android/app/src/main/AndroidManifest.xml') || '';
 iconNames.forEach(name => {
-  manifest.includes(`MainActivity${name}`)
-    ? ok(`Android activity-alias present: .MainActivity${name}`)
-    : fail(`Android activity-alias MISSING: .MainActivity${name} — run: node scripts/inject-app-icons.js`);
+  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+  manifest.includes(`MainActivity${capitalizedName}`)
+    ? ok(`Android activity-alias present: .MainActivity${capitalizedName}`)
+    : fail(`Android activity-alias MISSING: .MainActivity${capitalizedName}`);
 });
 
 // Check mipmap PNGs copied

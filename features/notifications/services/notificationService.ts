@@ -1,7 +1,7 @@
+import { useNotificationPrefsStore } from "@/features/settings/store/notificationPrefsStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
-import { useNotificationPrefsStore } from "@/features/settings/store/notificationPrefsStore";
+import { AppState, Platform } from "react-native";
 
 const MILESTONE_KEY = "@bookmark_milestone_reached";
 const REMINDER_NOTIFICATION_ID_KEY = "@engagement_reminder_notification_id";
@@ -61,7 +61,7 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
     shouldSetBadge: true,
-    shouldShowBanner: true,
+    shouldShowBanner: AppState.currentState !== "active",
     shouldShowList: true,
   }),
 });
@@ -86,7 +86,10 @@ function courseDeepLink(courseId: string) {
 }
 
 // ─── Enrollment notification — fires immediately on enroll ───────────────────
-export async function scheduleEnrollmentNotification(courseTitle: string, courseId?: string) {
+export async function scheduleEnrollmentNotification(
+  courseTitle: string,
+  courseId?: string,
+) {
   const prefs = useNotificationPrefsStore.getState();
   if (!prefs.masterEnabled || !prefs.categories.courseUpdates) return;
 
@@ -176,9 +179,13 @@ export async function scheduleCourseReengagementReminder(
     try {
       const parsed = JSON.parse(existing) as { notificationId?: string };
       if (parsed.notificationId) {
-        await Notifications.cancelScheduledNotificationAsync(parsed.notificationId);
+        await Notifications.cancelScheduledNotificationAsync(
+          parsed.notificationId,
+        );
       }
-    } catch { /* ignore malformed */ }
+    } catch {
+      /* ignore malformed */
+    }
   }
 
   const id = await Notifications.scheduleNotificationAsync({
@@ -213,15 +220,22 @@ export async function clearCourseReminderNotification() {
   try {
     const parsed = JSON.parse(existing) as { notificationId?: string };
     if (parsed.notificationId) {
-      await Notifications.cancelScheduledNotificationAsync(parsed.notificationId);
+      await Notifications.cancelScheduledNotificationAsync(
+        parsed.notificationId,
+      );
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   await AsyncStorage.removeItem(COURSE_REMINDER_NOTIFICATION_KEY);
 }
 
 export async function cancelAllNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
-  await AsyncStorage.multiRemove([REMINDER_NOTIFICATION_ID_KEY, COURSE_REMINDER_NOTIFICATION_KEY]);
+  await AsyncStorage.multiRemove([
+    REMINDER_NOTIFICATION_ID_KEY,
+    COURSE_REMINDER_NOTIFICATION_KEY,
+  ]);
 }
 
 // ─── Custom notification (used by send-notification screen) ──────────────────
@@ -232,7 +246,7 @@ export async function sendCustomNotification(
     delaySeconds?: number;
     courseId?: string;
     withActions?: boolean; // adds Yes/No buttons
-  }
+  },
 ) {
   const { delaySeconds = 0, courseId, withActions = false } = options ?? {};
 
@@ -250,8 +264,12 @@ export async function sendCustomNotification(
         ...(withActions && { categoryIdentifier: "YES_NO_ACTIONS" }),
       }),
     },
-    trigger: delaySeconds > 0
-      ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: delaySeconds }
-      : null,
+    trigger:
+      delaySeconds > 0
+        ? {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: delaySeconds,
+          }
+        : null,
   });
 }

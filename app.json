@@ -32,9 +32,6 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/appicon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
           "backgroundColor": "#48C78E"
         }
       ],

@@ -1,30 +1,30 @@
+import { analytics } from '@/core/services/analyticsService';
+import { clarityService } from '@/core/services/clarityService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
 import { Colors } from '@/core/theme/colors';
 import { useTheme } from '@/core/theme/useTheme';
 import { processUserMessage } from '@/features/ai/services/groqAgent';
 import { useAIStore } from '@/features/ai/store/aiStore';
-import { analytics } from '@/core/services/analyticsService';
-import { trackUserAction } from '@/core/services/sentryPerformance';
-import { clarityService } from '@/core/services/clarityService';
-import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { LegendList } from '@legendapp/list';
+import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bot, SendHorizonal, Sparkles, User, Lightbulb, Camera, Image as ImageIcon, X, ArrowRight } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Bot, Camera, Image as ImageIcon, Lightbulb, SendHorizonal, Sparkles, User, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ScrollView,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
 
 const SUGGESTED_PROMPTS = [
   "Recommend a React course",
@@ -32,11 +32,168 @@ const SUGGESTED_PROMPTS = [
   "How much are courses?",
 ];
 
+type InlineNode =
+  | { type: 'text'; text: string }
+  | { type: 'bold'; text: string }
+  | { type: 'italic'; text: string }
+  | { type: 'code'; text: string }
+  | { type: 'link'; text: string; href: string };
+
+function parseInlineMarkdown(text: string): InlineNode[] {
+  const nodes: InlineNode[] = [];
+  const pattern = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\*([^*]+)\*|_([^_]+)_)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push({ type: 'text', text: text.slice(lastIndex, match.index) });
+    }
+
+    if (match[2] && match[3]) {
+      nodes.push({ type: 'link', text: match[2], href: match[3] });
+    } else if (match[4] || match[5]) {
+      nodes.push({ type: 'bold', text: match[4] ?? match[5] ?? '' });
+    } else if (match[6]) {
+      nodes.push({ type: 'code', text: match[6] });
+    } else if (match[7] || match[8]) {
+      nodes.push({ type: 'italic', text: match[7] ?? match[8] ?? '' });
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push({ type: 'text', text: text.slice(lastIndex) });
+  }
+
+  return nodes;
+}
+
+function MarkdownText({ text, color }: { text: string; color: string }) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const blocks: React.ReactNode[] = [];
+  let codeBlock: string[] = [];
+  let inCodeBlock = false;
+
+  const flushCodeBlock = () => {
+    if (!codeBlock.length) return;
+    blocks.push(
+      <View key={`code-${blocks.length}`} style={{ backgroundColor: 'rgba(15,23,42,0.06)' }} className="rounded-2xl p-3 my-2 border border-slate-200">
+        <Text style={{ color: '#0F172A', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 13, lineHeight: 20 }}>
+          {codeBlock.join('\n')}
+        </Text>
+      </View>,
+    );
+    codeBlock = [];
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        flushCodeBlock();
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+      }
+      return;
+    }
+
+    if (inCodeBlock) {
+      codeBlock.push(line);
+      return;
+    }
+
+    if (!trimmed) {
+      blocks.push(<View key={`gap-${index}`} style={{ height: 10 }} />);
+      return;
+    }
+
+    if (/^#{1,3}\s/.test(trimmed)) {
+      const level = trimmed.match(/^#{1,3}/)?.[0].length ?? 1;
+      const headingText = trimmed.replace(/^#{1,3}\s*/, '');
+      blocks.push(
+        <Text
+          key={`heading-${index}`}
+          style={{
+            color,
+            fontSize: level === 1 ? 20 : level === 2 ? 18 : 16,
+            fontWeight: '800',
+            marginTop: 2,
+            marginBottom: 4,
+          }}
+        >
+          {headingText}
+        </Text>,
+      );
+      return;
+    }
+
+    if (/^([-*])\s+/.test(trimmed)) {
+      const bulletText = trimmed.replace(/^([-*])\s+/, '');
+      blocks.push(
+        <View key={`bullet-${index}`} className="flex-row items-start my-1">
+          <Text style={{ color, fontSize: 15, lineHeight: 22, marginRight: 8 }}>•</Text>
+          <Text style={{ color, fontSize: 15, lineHeight: 22, flex: 1 }}>
+            {parseInlineMarkdown(bulletText).map((node, nodeIndex) => {
+              if (node.type === 'bold') {
+                return <Text key={nodeIndex} style={{ fontWeight: '800' }}>{node.text}</Text>;
+              }
+              if (node.type === 'italic') {
+                return <Text key={nodeIndex} style={{ fontStyle: 'italic' }}>{node.text}</Text>;
+              }
+              if (node.type === 'code') {
+                return <Text key={nodeIndex} style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', backgroundColor: '#E2E8F0' }}>{node.text}</Text>;
+              }
+              if (node.type === 'link') {
+                return <Text key={nodeIndex} style={{ color: Colors.primary, textDecorationLine: 'underline' }}>{node.text}</Text>;
+              }
+              return <Text key={nodeIndex}>{node.text}</Text>;
+            })}
+          </Text>
+        </View>,
+      );
+      return;
+    }
+
+    blocks.push(
+      <Text key={`para-${index}`} style={{ color, fontSize: 15, lineHeight: 22 }}>
+        {parseInlineMarkdown(line).map((node, nodeIndex) => {
+          if (node.type === 'bold') {
+            return <Text key={nodeIndex} style={{ fontWeight: '800' }}>{node.text}</Text>;
+          }
+          if (node.type === 'italic') {
+            return <Text key={nodeIndex} style={{ fontStyle: 'italic' }}>{node.text}</Text>;
+          }
+          if (node.type === 'code') {
+            return <Text key={nodeIndex} style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', backgroundColor: '#E2E8F0' }}>{node.text}</Text>;
+          }
+          if (node.type === 'link') {
+            return <Text key={nodeIndex} style={{ color: Colors.primary, textDecorationLine: 'underline' }}>{node.text}</Text>;
+          }
+          return <Text key={nodeIndex}>{node.text}</Text>;
+        })}
+      </Text>,
+    );
+  });
+
+  if (inCodeBlock) {
+    flushCodeBlock();
+  }
+
+  return <View style={{ gap: 2 }}>{blocks}</View>;
+}
+
 export default function AITutorScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const listRef = useRef<any>(null);
-  const { C, isDark } = useTheme();
+  const { C } = useTheme();
+  const lightSurface = '#FFFFFF';
+  const lightBorder = '#E2E8F0';
+  const lightTextMuted = '#64748B';
   
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -139,15 +296,15 @@ export default function AITutorScreen() {
                 ? 'bg-primary rounded-br-sm'
                 : 'rounded-bl-sm border'
             }`}
-            style={!isUser ? { backgroundColor: C.surface, borderColor: C.border } : undefined}
+            style={!isUser ? { backgroundColor: lightSurface, borderColor: lightBorder } : undefined}
           >
-            <Text
-              className={`text-[15px] leading-6 tracking-wide ${
-                isUser ? 'text-white font-medium' : 'text-text dark:text-dark-text'
-              }`}
-            >
-              {item.text}
-            </Text>
+            {isUser ? (
+              <Text className="text-[15px] leading-6 tracking-wide text-white font-medium">
+                {item.text}
+              </Text>
+            ) : (
+              <MarkdownText text={item.text} color="#0F172A" />
+            )}
           </View>
 
           {isUser && (
@@ -185,38 +342,39 @@ export default function AITutorScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: C.background }}
+      style={{ flex: 1, backgroundColor: '#F8FAFC' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
       <View
-        className="border-b px-4 pb-4 shadow-sm z-10 flex-row items-center justify-between"
-        style={{ backgroundColor: C.surface, borderBottomColor: C.border, paddingTop: insets.top }}
+        className="px-4 pb-4 z-10 flex-row items-center justify-between"
+        style={{ backgroundColor: '#F8FAFC', paddingTop: insets.top }}
       >
         <TouchableOpacity
           onPress={() => router.back()}
           className="w-10 h-10 items-center justify-center rounded-full"
-          style={{ backgroundColor: C.surfaceElevated }}
+          style={{ backgroundColor: '#F1F5F9' }}
         >
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color="#0F172A" />
         </TouchableOpacity>
         
         <View className="items-center flex-row">
           <Sparkles size={16} color={Colors.primary} className="mr-2" />
-          <Text className="text-lg font-bold text-text dark:text-dark-text tracking-tight ml-2">AI Tutor</Text>
+          <Text className="text-lg font-bold text-text tracking-tight ml-2">AITV Assistance</Text>
         </View>
         
         <View className="w-10" />
       </View>
 
-      <View className="flex-1">
+      <View className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
         <LegendList
           ref={listRef}
           data={messages}
           renderItem={renderItem}
           keyExtractor={(item: any) => item.id}
           estimatedItemSize={80}
-          contentContainerStyle={{ paddingTop: 24, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingTop: 24, paddingBottom: 100, backgroundColor: '#F8FAFC' }}
+          style={{ backgroundColor: '#F8FAFC' }}
         />
         
         {isTyping && (
@@ -225,7 +383,7 @@ export default function AITutorScreen() {
               <Bot size={16} color={Colors.primary} />
             </View>
             <View
-              style={{ backgroundColor: C.surface, borderColor: C.border }}
+              style={{ backgroundColor: lightSurface, borderColor: lightBorder }}
               className="border rounded-3xl rounded-bl-sm px-5 py-4 shadow-sm flex-row items-center gap-1.5"
             >
               <View className="w-2.5 h-2.5 bg-primary/40 rounded-full animate-pulse" />
@@ -237,8 +395,7 @@ export default function AITutorScreen() {
       </View>
 
       <View
-        className="border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]"
-        style={{ paddingBottom: insets.bottom || 16, backgroundColor: C.surface, borderTopColor: C.border }}
+        style={{ paddingBottom: insets.bottom || 16, backgroundColor: '#F8FAFC' }}
       >
         {messages.length < 3 && !isTyping && (
           <View className="pt-3 pb-2 px-4">
@@ -274,7 +431,7 @@ export default function AITutorScreen() {
             </Animated.View>
           )}
 
-          <View className="flex-row items-end rounded-3xl px-2 py-1 shadow-inner border" style={{ backgroundColor: C.surfaceElevated, borderColor: C.border }}>
+          <View className="flex-row items-end rounded-3xl px-2 py-1 shadow-inner border" style={{ backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }}>
             <TouchableOpacity
               onPress={pickImage}
               className="w-10 h-10 mb-1 items-center justify-center"
@@ -292,14 +449,14 @@ export default function AITutorScreen() {
             <TextInput
               className="flex-1 min-h-[44px] max-h-32 px-2 py-2 text-[15px] text-text dark:text-dark-text"
               placeholder="Ask me anything..."
-              placeholderTextColor={C.textMuted}
+              placeholderTextColor={lightTextMuted}
               multiline
               value={inputText}
               onChangeText={setInputText}
             />
             <TouchableOpacity
               className={`w-10 h-10 mb-1 rounded-full items-center justify-center ${
-                (inputText.trim() || selectedImage) ? 'bg-primary' : (isDark ? 'bg-dark-surface-elevated' : 'bg-slate-100')
+                (inputText.trim() || selectedImage) ? 'bg-primary' : 'bg-slate-100'
               }`}
               onPress={() => handleSend(inputText)}
               disabled={(!inputText.trim() && !selectedImage) || isTyping}

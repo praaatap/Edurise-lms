@@ -77,6 +77,7 @@ export default function RegisterScreen() {
         password: data.password,
         role: 'USER',
       });
+      router.replace('/(tabs)');
     } catch (error: any) {
       const message = error.response?.data?.message || 'Registration failed. Try a different email.';
       setDialogConfig({ visible: true, title: 'Registration Failed', message });

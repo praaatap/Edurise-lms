@@ -15,6 +15,7 @@ export function FloatingAIBtn() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scale = useSharedValue(1);
+  const lift = useSharedValue(0);
 
   useEffect(() => {
     scale.value = withRepeat(
@@ -25,10 +26,18 @@ export function FloatingAIBtn() {
       -1,
       true
     );
-  }, [scale]);
+    lift.value = withRepeat(
+      withSequence(
+        withTiming(-3, { duration: 1600 }),
+        withTiming(0, { duration: 1600 })
+      ),
+      -1,
+      true
+    );
+  }, [lift, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ translateY: lift.value }, { scale: scale.value }],
   }));
 
   return (
@@ -37,20 +46,29 @@ export function FloatingAIBtn() {
         animatedStyle,
         {
           position: 'absolute',
-          bottom: insets.bottom + 80, // Above the tab bar
-          right: 20,
+          bottom: insets.bottom + 72,
+          right: 16,
           zIndex: 50,
         },
       ]}
     >
       <TouchableOpacity
-        className="w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg shadow-primary/40 border-2 border-white"
+        activeOpacity={0.85}
         onPress={() => router.push('/ai-tutor' as any)}
-        activeOpacity={0.8}
+        className="w-14 h-14 rounded-full items-center justify-center border"
+        style={{
+          backgroundColor: '#22C55E',
+          borderColor: 'rgba(255,255,255,0.95)',
+          shadowColor: '#000',
+          shadowOpacity: 0.18,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 8,
+        }}
       >
-        <BotMessageSquare size={26} color="white" />
-        {/* Unread indicator dot */}
-        <View className="absolute top-0 right-0 w-3.5 h-3.5 bg-accent rounded-full border-2 border-white" />
+        <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+          <BotMessageSquare size={20} color="#FFFFFF" />
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );

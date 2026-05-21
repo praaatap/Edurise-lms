@@ -9,6 +9,7 @@ export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
   const border = isDark ? '#334155' : '#f1f5f9';
   const cardTitle = isDark ? '#F8FAFC' : '#0f172a';
   const primaryLight = isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5';
+  const clarityProjectId = process.env.EXPO_PUBLIC_CLARITY_PROJECT_ID || 'wgo57ykk35';
 
   return `
     <!DOCTYPE html>
@@ -16,6 +17,14 @@ export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <!-- Microsoft Clarity Web Tracking -->
+        <script type="text/javascript">
+          (function(c,l,a,r,i,t,y){
+              c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+              t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+              y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+          })(window,document,"clarity","script","${clarityProjectId}");
+        </script>
         <style>
           :root {
             --primary: ${Colors.primary};
@@ -285,7 +294,7 @@ export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
         </style>
       </head>
       <body>
-        <div class="video-container" style="background-image: url('${course.thumbnail}'); background-size: cover; background-position: center;">
+        <div class="video-container" onclick="playVideo()" style="background-image: url('${course.thumbnail}'); background-size: cover; background-position: center; cursor: pointer;">
           <div class="play-btn"><div class="play-btn-triangle"></div></div>
           <div style="position: absolute; bottom: 16px; left: 20px; z-index: 10;">
             <span style="background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: bold; backdrop-filter: blur(4px);">Preview</span>
@@ -374,13 +383,73 @@ export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
           const answers = { q1: null };
           let totalScore = 0;
 
+          // Microsoft Clarity - Bidirectional Event helper
+          function logClarityEvent(name, params) {
+            try {
+              // 1. Log to WebView Clarity instance
+              if (window.clarity) {
+                window.clarity("event", name, params);
+              }
+            } catch (e) {
+              console.warn("[Clarity Web] Event error:", e);
+            }
+
+            try {
+              // 2. Forward to React Native clarityService via postMessage
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'CLARITY_EVENT',
+                  eventName: name,
+                  params: params || {}
+                }));
+              }
+            } catch (e) {
+              console.warn("[Clarity Web] Native bridge event error:", e);
+            }
+          }
+
+          // Listen for native credentials & identity
+          window.addEventListener('message', function(event) {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'NATIVE_HEADERS') {
+                const user = data.user;
+                if (user && window.clarity) {
+                  // Identify user in WebView Clarity using the native user ID
+                  window.clarity("identify", user._id || user.id);
+                  if (user.username || user.name) {
+                    window.clarity("set", "username", user.username || user.name);
+                  }
+                  if (user.email) {
+                    window.clarity("set", "email", user.email);
+                  }
+                  if (user.role) {
+                    window.clarity("set", "role", user.role);
+                  }
+                  if (data.claritySessionUrl) {
+                    // Tag web session with the native session URL for correlation
+                    window.clarity("set", "native_session_url", data.claritySessionUrl);
+                  }
+                  logClarityEvent('webview_clarity_linked', { userId: user._id || user.id });
+                }
+              }
+            } catch (e) {
+              console.warn("[Clarity Web] Message listener error:", e);
+            }
+          });
+
+          function playVideo() {
+            logClarityEvent('video_preview_played', { courseId: '${course.id}', title: '${course.title.replace(/'/g, "\\'")}' });
+            alert('Simulated video playback started.');
+          }
+
           function selectOption(label) {
             const input = label.querySelector('input');
             const qId = input.name;
             if (answers[qId] !== null) return; // Prevent change after submit
             
-            // Uncheck others in group visually handled by CSS :has, but we ensure radio is checked
             input.checked = true;
+            logClarityEvent('quiz_option_selected', { questionId: qId, option: input.value });
           }
 
           function checkAnswer(qId, correct) {
@@ -394,7 +463,8 @@ export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
 
             if (answers[qId] !== null) return; 
 
-            if (selected.value === correct) {
+            const isCorrect = selected.value === correct;
+            if (isCorrect) {
               feedback.innerHTML = '<strong>Correct!</strong> Great job.';
               feedback.className = 'feedback correct';
               totalScore += 100;
@@ -404,11 +474,17 @@ export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
             }
             
             feedback.style.display = 'block';
-            answers[qId] = selected.value === correct;
+            answers[qId] = isCorrect;
             
             // Disable
             document.querySelectorAll('input[name="' + qId + '"]').forEach(i => i.disabled = true);
             
+            logClarityEvent('quiz_answer_submitted', { 
+              questionId: qId, 
+              answer: selected.value, 
+              isCorrect: isCorrect 
+            });
+
             checkCompletion();
           }
 
@@ -427,6 +503,7 @@ export const generateCourseHtml = (course: Course, isDark: boolean = false) => {
           }
 
           function completeCourse() {
+            logClarityEvent('course_completed_clicked', { courseId: '${course.id}' });
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'COMPLETE_COURSE'

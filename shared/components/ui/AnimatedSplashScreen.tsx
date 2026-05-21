@@ -10,6 +10,17 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
+import { AppIconName, useAppIconStore } from '@/features/settings/store/appIconStore';
+
+// Mirror of the map in app/profile/app-icon.tsx — keeps splash in sync with chosen icon
+const ICON_IMAGES: Record<AppIconName, any> = {
+  default: require('../../../assets/images/appicon.png'),
+  Dark:    require('../../../assets/images/app-icons/icon-dark.png'),
+  Green:   require('../../../assets/images/app-icons/icon-green.png'),
+  Blue:    require('../../../assets/images/app-icons/icon-blue.png'),
+  Purple:  require('../../../assets/images/app-icons/icon-purple.png'),
+  Minimal: require('../../../assets/images/app-icons/icon-minimal.png'),
+};
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +29,7 @@ interface AnimatedSplashScreenProps {
 }
 
 export function AnimatedSplashScreen({ onAnimationComplete }: AnimatedSplashScreenProps) {
+  const selectedIcon = useAppIconStore((s) => s.selectedIcon);
   const logoScale = useSharedValue(0.5);
   const logoOpacity = useSharedValue(0);
   const logoTranslateX = useSharedValue(0);
@@ -79,7 +91,7 @@ export function AnimatedSplashScreen({ onAnimationComplete }: AnimatedSplashScre
       <View style={styles.content}>
         <Animated.View style={[styles.logoContainer, logoStyle]}>
           <Image
-            source={require('../../../assets/images/appicon.png')}
+            source={ICON_IMAGES[selectedIcon] ?? ICON_IMAGES['default']}
             style={styles.logo}
             contentFit="contain"
           />

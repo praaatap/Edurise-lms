@@ -136,6 +136,9 @@ export default function InstructorProfileScreen() {
                   onPress={handleCoursePress}
                   onToggleBookmark={toggleBookmark}
                   isBookmarked={bookmarks.includes(course.id)}
+                  isEnrolled={false}
+                  isCompleted={false}
+                  compact
                 />
               </Animated.View>
             ))}

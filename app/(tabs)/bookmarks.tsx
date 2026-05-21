@@ -1,8 +1,12 @@
+import { analytics } from '@/core/services/analyticsService';
+import { clarityService } from '@/core/services/clarityService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
 import { Colors } from '@/core/theme/colors';
 import { useTheme } from '@/core/theme/useTheme';
 import { CourseCard } from '@/features/courses/components/CourseCard';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { Course } from '@/shared/types';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { LegendList } from '@legendapp/list';
@@ -10,19 +14,15 @@ import * as Haptics from 'expo-haptics';
 import { Href, useRouter } from 'expo-router';
 import { Bookmark, Share2, Trash2, Video } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { RefreshControl, Share, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Share, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { analytics } from '@/core/services/analyticsService';
-import { trackUserAction } from '@/core/services/sentryPerformance';
-import { clarityService } from '@/core/services/clarityService';
-import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 
 export default function BookmarksScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { courses, bookmarks, toggleBookmark, enrollCourse, refreshCourses, isLoading } = useCourseStore();
+  const { courses, bookmarks, enrolledCourses, completedCourses, toggleBookmark, enrollCourse, refreshCourses, isLoading } = useCourseStore();
   const { C, isDark } = useTheme();
 
   useScreenTracking('Bookmarks');
@@ -35,6 +35,9 @@ export default function BookmarksScreen() {
     courses.filter(c => bookmarks.includes(c.id)),
     [courses, bookmarks]
   );
+  const bookmarkedSet = useMemo(() => new Set(bookmarks), [bookmarks]);
+  const enrolledSet = useMemo(() => new Set(enrolledCourses), [enrolledCourses]);
+  const completedSet = useMemo(() => new Set(completedCourses), [completedCourses]);
 
   const handleCoursePress = useCallback((course: Course) => {
     clarityService.logEvent('course_viewed', { courseId: course.id, title: course.title, source: 'bookmarks' });
@@ -53,26 +56,24 @@ export default function BookmarksScreen() {
     if (!selectedCourse) return;
     bottomSheetRef.current?.close();
 
-    setTimeout(async () => {
-      if (action === 'delete') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        trackUserAction('bookmark_removed', { courseId: selectedCourse.id });
-        clarityService.logEvent('course_unbookmarked', { courseId: selectedCourse.id, source: 'bookmarks_screen' });
-        analytics.logEvent('bookmarks_course_removed', { courseId: selectedCourse.id, title: selectedCourse.title });
-        toggleBookmark(selectedCourse.id);
-      } else if (action === 'share') {
-        trackUserAction('bookmark_shared', { courseId: selectedCourse.id });
-        clarityService.logEvent('course_shared', { courseId: selectedCourse.id });
-        analytics.logEvent('bookmarks_course_shared', { courseId: selectedCourse.id, title: selectedCourse.title });
-        await Share.share({
-          message: `Check out this awesome course on Edurise LMS: ${selectedCourse.title}`,
-        });
-      } else if (action === 'enroll') {
-        enrollCourse(selectedCourse.id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.push(`/course/${selectedCourse.id}` as Href);
-      }
-    }, 300);
+    if (action === 'delete') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      trackUserAction('bookmark_removed', { courseId: selectedCourse.id });
+      clarityService.logEvent('course_unbookmarked', { courseId: selectedCourse.id, source: 'bookmarks_screen' });
+      analytics.logEvent('bookmarks_course_removed', { courseId: selectedCourse.id, title: selectedCourse.title });
+      toggleBookmark(selectedCourse.id);
+    } else if (action === 'share') {
+      trackUserAction('bookmark_shared', { courseId: selectedCourse.id });
+      clarityService.logEvent('course_shared', { courseId: selectedCourse.id });
+      analytics.logEvent('bookmarks_course_shared', { courseId: selectedCourse.id, title: selectedCourse.title });
+      await Share.share({
+        message: `Check out this awesome course on Edurise LMS: ${selectedCourse.title}`,
+      });
+    } else if (action === 'enroll') {
+      enrollCourse(selectedCourse.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push(`/course/${selectedCourse.id}` as Href);
+    }
   }, [selectedCourse, toggleBookmark, enrollCourse, router]);
 
   const renderBackdrop = useCallback(
@@ -82,24 +83,18 @@ export default function BookmarksScreen() {
 
   const renderItem = useCallback(({ item, index }: { item: Course; index: number }) => (
     <Animated.View entering={FadeInDown.delay(index * 70).springify().damping(14)}>
-      <TouchableOpacity
-        activeOpacity={0.9}
+      <CourseCard
+        course={item}
         onPress={() => handleCoursePress(item)}
-        onLongPress={() => handleLongPress(item)}
-        delayLongPress={400}
-      >
-        <View pointerEvents="none">
-          <CourseCard
-            course={item}
-            onPress={() => handleCoursePress(item)}
-            onToggleBookmark={() => {}}
-            isBookmarked={true}
-            index={index}
-          />
-        </View>
-      </TouchableOpacity>
+        onLongPress={handleLongPress}
+        onToggleBookmark={toggleBookmark}
+        isBookmarked={bookmarkedSet.has(item.id)}
+        isEnrolled={enrolledSet.has(item.id)}
+        isCompleted={completedSet.has(item.id)}
+        compact
+      />
     </Animated.View>
-  ), [handleLongPress, handleCoursePress]);
+  ), [handleLongPress, handleCoursePress, toggleBookmark, bookmarkedSet, enrolledSet, completedSet]);
 
   const handleRefresh = useCallback(async () => {
     await refreshCourses();

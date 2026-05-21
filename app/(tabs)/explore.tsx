@@ -1,9 +1,13 @@
+import { analytics } from '@/core/services/analyticsService';
+import { clarityService } from '@/core/services/clarityService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
 import { Colors } from '@/core/theme/colors';
 import { useTheme } from '@/core/theme/useTheme';
 import { CourseCard } from '@/features/courses/components/CourseCard';
 import { SearchBar } from '@/features/courses/components/SearchBar';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
+import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { Course } from '@/shared/types';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { LegendList } from '@legendapp/list';
@@ -11,12 +15,8 @@ import * as Haptics from 'expo-haptics';
 import { Href, useRouter } from 'expo-router';
 import { Code, SlidersHorizontal, X } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { analytics } from '@/core/services/analyticsService';
-import { trackUserAction } from '@/core/services/sentryPerformance';
-import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
-import { clarityService } from '@/core/services/clarityService';
 const CATEGORIES = [
   'All',
   'Web Dev',
@@ -36,7 +36,7 @@ function useExploreLogic() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { courses, searchQuery, searchCourses, bookmarks, toggleBookmark, aiRecommendedIds, refreshCourses, isLoading } = useCourseStore();
+  const { courses, searchQuery, searchCourses, bookmarks, enrolledCourses, completedCourses, toggleBookmark, aiRecommendedIds, refreshCourses, isLoading } = useCourseStore();
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   useScreenTracking('Explore');
@@ -113,6 +113,8 @@ function useExploreLogic() {
     filteredCourses,
     searchQuery,
     bookmarks,
+    enrolledCourses,
+    completedCourses,
     toggleBookmark,
     selectedCategory,
     selectedLevel,
@@ -138,6 +140,8 @@ export default function TechExploreScreen() {
     filteredCourses,
     searchQuery,
     bookmarks,
+    enrolledCourses,
+    completedCourses,
     toggleBookmark,
     selectedCategory,
     selectedLevel,
@@ -156,6 +160,9 @@ export default function TechExploreScreen() {
     listPaddingHorizontal,
   } = useExploreLogic();
   const { C, isDark } = useTheme();
+  const bookmarkedSet = useMemo(() => new Set(bookmarks), [bookmarks]);
+  const enrolledSet = useMemo(() => new Set(enrolledCourses), [enrolledCourses]);
+  const completedSet = useMemo(() => new Set(completedCourses), [completedCourses]);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['65%'], []);
@@ -171,10 +178,13 @@ export default function TechExploreScreen() {
         course={item}
         onPress={handleCoursePress}
         onToggleBookmark={toggleBookmark}
-        isBookmarked={bookmarks.includes(item.id)}
+        isBookmarked={bookmarkedSet.has(item.id)}
+        isEnrolled={enrolledSet.has(item.id)}
+        isCompleted={completedSet.has(item.id)}
+        compact
       />
     </View>
-  ), [handleCoursePress, toggleBookmark, bookmarks]);
+  ), [handleCoursePress, toggleBookmark, bookmarkedSet, enrolledSet, completedSet]);
 
   const ListHeader = useMemo(() => (
     <View className="px-1">
@@ -220,15 +230,22 @@ export default function TechExploreScreen() {
                 style={{
                   backgroundColor: isSelected ? Colors.primary : C.surface,
                   borderColor: isSelected ? Colors.primary : C.border,
+                  shadowColor: isSelected ? Colors.primary : '#000',
+                  shadowOpacity: isSelected ? 0.18 : 0,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 3 },
                 }}
-                className="mr-3 px-5 py-2.5 rounded-full border"
+                className="mr-3 px-5 py-3 rounded-full border"
               >
-                <Text
-                  style={{ color: isSelected ? 'white' : C.text }}
-                  className="font-medium"
-                >
-                  {category}
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  {isSelected && <View className="h-2 w-2 rounded-full bg-white" />}
+                  <Text
+                    style={{ color: isSelected ? 'white' : C.text }}
+                    className="font-medium"
+                  >
+                    {category}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           })}

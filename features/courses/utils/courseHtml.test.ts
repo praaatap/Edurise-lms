@@ -29,4 +29,12 @@ describe('Course HTML Generator', () => {
     // Dark mode background
     expect(darkHtml).toContain('--background: #0F172A');
   });
+
+  it('should inject Microsoft Clarity web tracking and session correlation script', () => {
+    const html = generateCourseHtml(mockCourse);
+    expect(html).toContain('Microsoft Clarity Web Tracking');
+    expect(html).toContain('window.clarity');
+    expect(html).toContain('logClarityEvent');
+    expect(html).toContain('webview_clarity_linked');
+  });
 });

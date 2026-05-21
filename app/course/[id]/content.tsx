@@ -30,6 +30,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 
 export default function CourseContentScreen() {
   const { C, isDark } = useTheme();
@@ -44,6 +45,7 @@ export default function CourseContentScreen() {
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
   const [noteText, setNoteText] = useState('');
   const shouldScheduleReminderRef = useRef(true);
+  const [sessionUrl, setSessionUrl] = useState<string | null>(clarityService.sessionUrl);
 
   const [dialogConfig, setDialogConfig] = useState<{
     visible: boolean;
@@ -102,6 +104,10 @@ export default function CourseContentScreen() {
         trackUserAction('quiz_scored', { courseId: id as string, score: data.score });
         clarityService.logEvent('quiz_completed', { courseId: String(id), score: data.score });
         updateQuizScore(id as string, data.score);
+      } else if (data.type === 'CLARITY_EVENT') {
+        const { eventName, params } = data;
+        clarityService.logCustomEvent(eventName, { courseId: String(id), ...params });
+        trackUserAction(`webview_${eventName}`, { courseId: String(id), ...params });
       }
     } catch {
       setWebViewError('Could not process content interaction. Please reload and try again.');
@@ -142,6 +148,37 @@ export default function CourseContentScreen() {
       void scheduleCourseReengagementReminder(course.id, course.title, 60 * 60);
     };
   }, [course]);
+
+  useEffect(() => {
+    if (sessionUrl) {
+      webViewRef.current?.postMessage(
+        JSON.stringify({
+          type: 'NATIVE_HEADERS',
+          headers: nativeHeaders,
+          user: user,
+          claritySessionUrl: sessionUrl,
+        })
+      );
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      const url = await clarityService.getSessionUrl();
+      if (url) {
+        setSessionUrl(url);
+        webViewRef.current?.postMessage(
+          JSON.stringify({
+            type: 'NATIVE_HEADERS',
+            headers: nativeHeaders,
+            user: user,
+            claritySessionUrl: url,
+          })
+        );
+        clearInterval(interval);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [sessionUrl, user, nativeHeaders]);
 
   if (!course) return null;
 
@@ -203,6 +240,33 @@ export default function CourseContentScreen() {
         <View className="h-full bg-primary" style={{ width: `${progress * 100}%` }} />
       </View>
 
+      <View className="px-4 pt-4">
+        <View className="flex-row items-center rounded-[28px] p-3 border" style={{ backgroundColor: C.surface, borderColor: C.border }}>
+          <Image
+            source={{ uri: course.thumbnail }}
+            className="w-20 h-20 rounded-2xl mr-4"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+          <View className="flex-1">
+            <Text className="text-lg font-extrabold text-text dark:text-dark-text" numberOfLines={2}>
+              {course.title}
+            </Text>
+            <Text className="mt-1 text-sm text-text-muted dark:text-dark-text-muted" numberOfLines={1}>
+              {course.instructor.name} • {course.category}
+            </Text>
+            <View className="flex-row items-center mt-3 gap-2">
+              <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: C.surfaceElevated }}>
+                <Text className="text-[11px] font-bold" style={{ color: C.text }}>Video lessons</Text>
+              </View>
+              <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(34,197,94,0.12)' }}>
+                <Text className="text-[11px] font-bold text-success">Offline ready</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+
       <View className="flex-1">
       {/* web view  */}
         <WebView
@@ -219,6 +283,7 @@ export default function CourseContentScreen() {
                 type: 'NATIVE_HEADERS',
                 headers: nativeHeaders,
                 user: user,
+                claritySessionUrl: clarityService.sessionUrl || sessionUrl,
               })
             );
           }}

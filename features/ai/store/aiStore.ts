@@ -1,9 +1,9 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
 export interface Message {
   id: string;
   text: string;
-  sender: 'user' | 'ai';
+  sender: "user" | "ai";
   timestamp: Date;
   courseId?: string;
 }
@@ -11,25 +11,21 @@ export interface Message {
 interface AIState {
   messages: Message[];
   isTyping: boolean;
-  addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => string;
+  addMessage: (message: Omit<Message, "id" | "timestamp">) => string;
   appendMessageChunk: (id: string, chunk: string) => void;
   setTyping: (typing: boolean) => void;
   clearMessages: () => void;
 }
 
-
-const DEFAULT_MESSAGES: Message =
-{
-  id: 'welcome',
-  text: "Hi! I'm your AI Tutor. I can help you find courses, explain concepts, or plan your learning path. What would you like to learn today?",
-  sender: 'ai',
+const DEFAULT_MESSAGES: Message = {
+  id: "welcome",
+  text: "Hi! I'm your AITV Assistant. I can help you find courses, explain concepts, or plan your learning path. What would you like to learn today?",
+  sender: "ai",
   timestamp: new Date(),
 };
 
 export const useAIStore = create<AIState>((set) => ({
-  messages: [
-    DEFAULT_MESSAGES
-  ],
+  messages: [DEFAULT_MESSAGES],
   isTyping: false,
 
   addMessage: (msg) => {
@@ -40,15 +36,17 @@ export const useAIStore = create<AIState>((set) => ({
     return id;
   },
 
-  appendMessageChunk: (id, chunk) => set((state) => ({
-    messages: state.messages.map((m) =>
-      m.id === id ? { ...m, text: m.text + chunk } : m
-    )
-  })),
+  appendMessageChunk: (id, chunk) =>
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m.id === id ? { ...m, text: m.text + chunk } : m,
+      ),
+    })),
 
   setTyping: (isTyping) => set({ isTyping }),
 
-  clearMessages: () => set({
-    messages: [DEFAULT_MESSAGES]
-  }),
+  clearMessages: () =>
+    set({
+      messages: [DEFAULT_MESSAGES],
+    }),
 }));
