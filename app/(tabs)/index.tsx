@@ -12,12 +12,14 @@ import { BookOpen, Compass, Flame, Check, Sparkles } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { analytics } from '@/core/services/analyticsService';
 import { trackUserAction } from '@/core/services/sentryPerformance';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+
+const CATEGORY_PILLS = ['All', 'Web Dev', 'Mobile App', 'AI & ML', 'Design', 'Cloud'];
 function useHomeLogic() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -114,17 +116,17 @@ export default function HomeScreen() {
     aiRecommendedIds,
     inProgressCourses,
   } = useHomeLogic();
-  const { C } = useTheme();
+  const { C, isDark } = useTheme();
+  const [activeCategory, setActiveCategory] = useState('All');
 
-  const renderItem = useCallback(({ item }: { item: Course }) => (
-    <View className="mb-5">
-      <CourseCard
-        course={item}
-        onPress={handleCoursePress}
-        onToggleBookmark={toggleBookmark}
-        isBookmarked={bookmarks.includes(item.id)}
-      />
-    </View>
+  const renderItem = useCallback(({ item, index }: { item: Course; index: number }) => (
+    <CourseCard
+      course={item}
+      onPress={handleCoursePress}
+      onToggleBookmark={toggleBookmark}
+      isBookmarked={bookmarks.includes(item.id)}
+      index={index}
+    />
   ), [handleCoursePress, toggleBookmark, bookmarks]);
 
   const uniqueInstructors = useMemo(() => {
@@ -269,11 +271,48 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <View className="mb-4 px-4 flex-row items-center">
-        <Text className="text-xl font-bold text-text dark:text-dark-text">
-          All Courses
+      <View className="mb-4 px-4 flex-row items-center justify-between">
+        <Text className="text-xl font-bold text-text dark:text-dark-text">All Courses</Text>
+        <Text style={{ color: C.textMuted, fontSize: 13, fontWeight: '600' }}>
+          {activeCategory === 'All' ? courses.length : courses.filter(c => c.category.toLowerCase().includes(activeCategory.toLowerCase())).length} courses
         </Text>
       </View>
+
+      {/* Category filter pills */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 16 }}
+      >
+        {CATEGORY_PILLS.map((cat, i) => {
+          const active = activeCategory === cat;
+          return (
+            <Animated.View key={cat} entering={FadeInDown.delay(i * 40).springify()}>
+              <TouchableOpacity
+                onPress={() => setActiveCategory(cat)}
+                activeOpacity={0.75}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  backgroundColor: active ? Colors.primary : (isDark ? 'rgba(255,255,255,0.07)' : '#F1F5F9'),
+                  borderWidth: 1,
+                  borderColor: active ? Colors.primary : (isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0'),
+                }}
+              >
+                <Text style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: active ? '#fff' : C.textMuted,
+                  letterSpacing: 0.2,
+                }}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+      </ScrollView>
     </View>
   ), [
     firstName,
@@ -286,6 +325,9 @@ export default function HomeScreen() {
     bookmarks,
     streak,
     C.surface,
+    C.textMuted,
+    activeCategory,
+    isDark,
   ]);
 
   const ListEmpty = useMemo(() => {
@@ -355,7 +397,7 @@ export default function HomeScreen() {
           key="content-view"
         >
           <LegendList
-            data={courses}
+            data={activeCategory === 'All' ? courses : courses.filter(c => c.category.toLowerCase().includes(activeCategory.toLowerCase()))}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             estimatedItemSize={340}

@@ -1,14 +1,26 @@
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '@/core/theme/useTheme';
 import { Colors } from '@/core/theme/colors';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { setAlternateAppIcon, resetAppIcon } from 'expo-alternate-app-icons';
+import { setAlternateAppIcon } from 'expo-alternate-app-icons';
 import { useAppIconStore, APP_ICONS, AppIconName } from '@/features/settings/store/appIconStore';
 import { analytics } from '@/core/services/analyticsService';
+import { clarityService } from '@/core/services/clarityService';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
+
+// Map icon name → local PNG asset (keys match PascalCase plugin names)
+const ICON_IMAGES: Record<AppIconName, any> = {
+  default: require('@/assets/images/appicon.png'),
+  Dark:    require('@/assets/images/app-icons/icon-dark.png'),
+  Green:   require('@/assets/images/app-icons/icon-green.png'),
+  Blue:    require('@/assets/images/app-icons/icon-blue.png'),
+  Purple:  require('@/assets/images/app-icons/icon-purple.png'),
+  Minimal: require('@/assets/images/app-icons/icon-minimal.png'),
+};
 
 export default function AppIconScreen() {
   const { C, isDark } = useTheme();
@@ -24,13 +36,11 @@ export default function AppIconScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      if (iconName === 'default') {
-        await resetAppIcon();
-      } else {
-        await setAlternateAppIcon(iconName);
-      }
+      // null resets to default; PascalCase name selects alternate
+      await setAlternateAppIcon(iconName === 'default' ? null : iconName);
 
       setSelectedIcon(iconName);
+      clarityService.logEvent('app_icon_changed', { icon: iconName });
       analytics.logEvent('app_icon_changed', { icon: iconName });
     } catch (error: any) {
       const msg = error?.message || String(error);
@@ -70,46 +80,55 @@ export default function AppIconScreen() {
                 key={icon.name}
                 onPress={() => handleIconSelect(icon.name)}
                 activeOpacity={0.7}
-                style={{
-                  alignItems: 'center',
-                  width: 100,
-                }}
+                style={{ alignItems: 'center', width: 100 }}
               >
-                <View
-                  style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: 18,
-                    backgroundColor: icon.color,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: isSelected ? 3 : 1,
-                    borderColor: isSelected ? Colors.primary : (isDark ? Colors.dark.border : '#e2e8f0'),
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    elevation: 3,
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>E</Text>
+                {/* Outer wrapper — holds image + badge together, no overflow hidden */}
+                <View style={{ width: 72, height: 72 }}>
+                  {/* Icon image with rounded corners + selection border */}
+                  <View
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 18,
+                      borderWidth: isSelected ? 3 : 1.5,
+                      borderColor: isSelected ? Colors.primary : (isDark ? Colors.dark.border : '#e2e8f0'),
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 8,
+                      elevation: 4,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Image
+                      source={ICON_IMAGES[icon.name]}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      cachePolicy="memory"
+                    />
+                  </View>
+
+                  {/* Check badge — outside overflow:hidden so it's not clipped */}
                   {isSelected && (
                     <View style={{
                       position: 'absolute', bottom: -4, right: -4,
                       width: 22, height: 22, borderRadius: 11,
                       backgroundColor: Colors.primary,
                       alignItems: 'center', justifyContent: 'center',
-                      borderWidth: 2, borderColor: isDark ? Colors.dark.background : '#fff',
+                      borderWidth: 2.5,
+                      borderColor: isDark ? Colors.dark.background : '#fff',
+                      elevation: 5,
                     }}>
-                      <Check size={12} color="#fff" />
+                      <Check size={11} color="#fff" />
                     </View>
                   )}
                 </View>
+
                 <Text style={{
                   color: isSelected ? Colors.primary : C.text,
                   fontSize: 12,
                   fontWeight: isSelected ? '700' : '500',
-                  marginTop: 8,
+                  marginTop: 10,
                 }}>
                   {icon.label}
                 </Text>

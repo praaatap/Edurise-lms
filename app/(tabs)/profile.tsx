@@ -10,12 +10,15 @@ import * as ImagePicker from 'expo-image-picker';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import * as Sentry from '@sentry/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { CustomDialog } from '@/shared/components/ui/CustomDialog';
 import { analytics } from '@/core/services/analyticsService';
+import { clarityService } from '@/core/services/clarityService';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import { UnsplashPicker } from '@/shared/components/ui/UnsplashPicker';
 
@@ -47,6 +50,9 @@ export default function ProfileScreen() {
     type?: 'default' | 'destructive' | 'success';
   }>({ visible: false, title: '', message: '' });
   const [isUnsplashVisible, setIsUnsplashVisible] = useState(false);
+  const [photoHistory, setPhotoHistory] = useState<string[]>([]);
+  const { width } = useWindowDimensions();
+  const photoGridSize = (width - 40 - 4) / 3; // 3 columns with 2px gaps
 
   const completionProgress =
     enrolledCourses.length === 0 ? 0
@@ -72,6 +78,7 @@ export default function ProfileScreen() {
     const nextTheme = isDarkToggle ? 'dark' : 'light';
     setTheme(nextTheme);
     setColorScheme(nextTheme);
+    clarityService.logEvent('theme_changed', { theme: nextTheme });
     analytics.logEvent('theme_changed', { theme: nextTheme });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [setTheme, setColorScheme]);
@@ -125,6 +132,7 @@ export default function ProfileScreen() {
         const uri = result.assets[0].uri;
         setGlobalLocalAvatar(uri);
         updateProfile({ avatar: { url: uri, localPath: uri } });
+        setPhotoHistory(prev => [uri, ...prev.filter(u => u !== uri)].slice(0, 9));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch {
@@ -135,6 +143,7 @@ export default function ProfileScreen() {
   const handleUnsplashSelect = useCallback((url: string) => {
     setGlobalLocalAvatar(url);
     updateProfile({ avatar: { url, localPath: url } });
+    setPhotoHistory(prev => [url, ...prev.filter(u => u !== url)].slice(0, 9));
     setIsUnsplashVisible(false);
     analytics.logEvent('profile_image_updated', { source: 'unsplash' });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -183,6 +192,73 @@ export default function ProfileScreen() {
         <LevelProgress level={level} xp={xp} xpToNextLevel={xpToNextLevel} xpProgress={xpProgress} />
 
         <ProfileStats enrolledCount={enrolledCourses.length} bookmarksCount={bookmarks.length} progress={completionProgress} />
+
+        {/* Photo History — Instagram-style grid */}
+        {(photoHistory.length > 0 || globalLocalAvatar) && (
+          <Animated.View entering={FadeInDown.springify()} style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ color: C.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5 }}>
+                Photos
+              </Text>
+              <TouchableOpacity onPress={showImagePickerOptions}>
+                <Text style={{ color: Colors.primary, fontSize: 12, fontWeight: '700' }}>+ Add</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2 }}>
+              {[globalLocalAvatar, ...photoHistory.filter(p => p !== globalLocalAvatar)]
+                .filter(Boolean)
+                .slice(0, 9)
+                .map((uri, i) => (
+                  <Animated.View
+                    key={uri}
+                    entering={FadeIn.delay(i * 50)}
+                    style={{
+                      width: photoGridSize,
+                      height: photoGridSize,
+                      borderRadius: i === 0 ? 14 : 8,
+                      overflow: 'hidden',
+                      borderWidth: i === 0 ? 2.5 : 0,
+                      borderColor: i === 0 ? Colors.primary : 'transparent',
+                    }}
+                  >
+                    <TouchableOpacity activeOpacity={0.8} onPress={showImagePickerOptions}>
+                      <Image
+                        source={{ uri: uri! }}
+                        style={{ width: photoGridSize, height: photoGridSize }}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+                      {i === 0 && (
+                        <View style={{
+                          position: 'absolute', bottom: 4, left: 4,
+                          backgroundColor: Colors.primary,
+                          borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+                        }}>
+                          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>CURRENT</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              {/* Add more button if less than 9 */}
+              {[globalLocalAvatar, ...photoHistory].filter(Boolean).length < 9 && (
+                <TouchableOpacity
+                  onPress={showImagePickerOptions}
+                  activeOpacity={0.7}
+                  style={{
+                    width: photoGridSize, height: photoGridSize,
+                    borderRadius: 8, borderWidth: 1.5, borderStyle: 'dashed',
+                    borderColor: C.border, alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                  }}
+                >
+                  <Ionicons name="add" size={24} color={C.textMuted} />
+                  <Text style={{ color: C.textMuted, fontSize: 10, fontWeight: '600', marginTop: 4 }}>Add Photo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </Animated.View>
+        )}
 
         {/* Achievements */}
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>

@@ -5,7 +5,9 @@ import { CourseCard } from '@/features/courses/components/CourseCard';
 import { Course } from '@/shared/types';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { ArrowLeft, Mail, MapPin, Award } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { clarityService } from '@/core/services/clarityService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +22,10 @@ export default function InstructorProfileScreen() {
   const { courses, bookmarks, toggleBookmark } = useCourseStore();
 
   useScreenTracking(`InstructorProfile_${id}`);
+
+  useEffect(() => {
+    if (id) clarityService.logEvent('instructor_profile_viewed', { instructorId: String(id) });
+  }, [id]);
 
   const instructorCourses = useMemo(() => {
     return courses.filter((c) => c.instructor.id === id);
@@ -39,6 +45,8 @@ export default function InstructorProfileScreen() {
   }
 
   const handleCoursePress = (course: Course) => {
+    clarityService.logEvent('course_viewed', { courseId: course.id, source: 'instructor_profile' });
+    trackUserAction('instructor_course_tapped', { courseId: course.id, instructorId: String(id) });
     router.push(`/course/${course.id}`);
   };
 

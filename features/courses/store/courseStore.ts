@@ -233,7 +233,7 @@ export const useCourseStore = create<CourseState>()(
           }
           clarityService.logEvent('course_enrolled', { courseId, title: course?.title ?? '' });
           analytics.logEvent('course_enroll', { courseId });
-          if (course) scheduleEnrollmentNotification(course.title);
+          if (course) scheduleEnrollmentNotification(course.title, courseId);
         }
       },
 

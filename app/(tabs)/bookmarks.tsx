@@ -10,10 +10,12 @@ import * as Haptics from 'expo-haptics';
 import { Href, useRouter } from 'expo-router';
 import { Bookmark, Share2, Trash2, Video } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Share, Text, TouchableOpacity, View, useWindowDimensions, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analytics } from '@/core/services/analyticsService';
 import { trackUserAction } from '@/core/services/sentryPerformance';
+import { clarityService } from '@/core/services/clarityService';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 
 export default function BookmarksScreen() {
@@ -35,6 +37,7 @@ export default function BookmarksScreen() {
   );
 
   const handleCoursePress = useCallback((course: Course) => {
+    clarityService.logEvent('course_viewed', { courseId: course.id, title: course.title, source: 'bookmarks' });
     analytics.logEvent('course_tapped', { courseId: course.id, title: course.title, source: 'bookmarks' });
     router.push(`/course/${course.id}` as Href);
   }, [router]);
@@ -54,10 +57,12 @@ export default function BookmarksScreen() {
       if (action === 'delete') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         trackUserAction('bookmark_removed', { courseId: selectedCourse.id });
+        clarityService.logEvent('course_unbookmarked', { courseId: selectedCourse.id, source: 'bookmarks_screen' });
         analytics.logEvent('bookmarks_course_removed', { courseId: selectedCourse.id, title: selectedCourse.title });
         toggleBookmark(selectedCourse.id);
       } else if (action === 'share') {
         trackUserAction('bookmark_shared', { courseId: selectedCourse.id });
+        clarityService.logEvent('course_shared', { courseId: selectedCourse.id });
         analytics.logEvent('bookmarks_course_shared', { courseId: selectedCourse.id, title: selectedCourse.title });
         await Share.share({
           message: `Check out this awesome course on Edurise LMS: ${selectedCourse.title}`,
@@ -75,8 +80,8 @@ export default function BookmarksScreen() {
     []
   );
 
-  const renderItem = useCallback(({ item }: { item: Course }) => (
-    <View className="mb-5">
+  const renderItem = useCallback(({ item, index }: { item: Course; index: number }) => (
+    <Animated.View entering={FadeInDown.delay(index * 70).springify().damping(14)}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => handleCoursePress(item)}
@@ -89,10 +94,11 @@ export default function BookmarksScreen() {
             onPress={() => handleCoursePress(item)}
             onToggleBookmark={() => {}}
             isBookmarked={true}
+            index={index}
           />
         </View>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   ), [handleLongPress, handleCoursePress]);
 
   const handleRefresh = useCallback(async () => {

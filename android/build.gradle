@@ -1,5 +1,10 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
+// Override NDK version — 27.1.12297006 is corrupted on this machine, use installed 28.2.13676358
+ext {
+    ndkVersion = "28.2.13676358"
+}
+
 buildscript {
   repositories {
     google()

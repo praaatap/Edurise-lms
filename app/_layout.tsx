@@ -35,6 +35,7 @@ import { useNetworkStatus } from '@/shared/utils/network';
 import { ErrorBoundary } from '@/shared/components/ui/ErrorBoundary';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useThemeStore } from '@/core/theme/themeStore';
+import * as Notifications from 'expo-notifications';
 import { requestPermissions, scheduleReminderNotification } from '@/features/notifications/services/notificationService';
 import { analytics } from '@/core/services/analyticsService';
 import { useUpdates } from '@/shared/hooks/useUpdates';
@@ -79,6 +80,35 @@ function RootLayoutContent() {
   
   // EAS Updates
   useUpdates();
+
+  // Handle notification taps — navigate to the course the notification references
+  useEffect(() => {
+    // Foreground taps — always safe to handle immediately
+    const sub = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+    return () => sub.remove();
+  }, []);
+
+  // Cold-start tap — only process after app is fully ready + authenticated
+  useEffect(() => {
+    if (!isReady || isAuthLoading || !isUnlocked) return;
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) handleNotificationResponse(response);
+    });
+  }, [isReady, isAuthLoading, isUnlocked]);
+
+  function handleNotificationResponse(response: Notifications.NotificationResponse) {
+    const data = response.notification.request.content.data as Record<string, any>;
+    const actionId = response.actionIdentifier;
+
+    // "No" / "Later" / dismiss — do nothing
+    if (actionId === 'NO' || actionId === 'LATER' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER && !data?.courseId) return;
+
+    // Navigate to course if courseId is present (direct tap or "Yes" action)
+    const courseId = data?.courseId as string | undefined;
+    if (courseId && useAuthStore.getState().isAuthenticated) {
+      router.push(`/course/${courseId}` as any);
+    }
+  }
 
   const [dialogConfig, setDialogConfig] = useState<{
     visible: boolean;

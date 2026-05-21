@@ -57,7 +57,9 @@ export const useAuthStore = create<AuthState>()(
           clarityService.identifyUser(res.data.user);
           clarityService.logEvent('login_success', { role: res.data.user.role ?? 'user' });
           analytics.logEvent('login_success', { userId: res.data.user._id });
-        } catch (error) {
+        } catch (error: any) {
+          clarityService.logEvent('login_failed');
+          trackUserAction('login_failed', { reason: error?.response?.data?.message || 'unknown' });
           set({ isLoading: false });
           throw error;
         }
@@ -74,7 +76,9 @@ export const useAuthStore = create<AuthState>()(
           });
           clarityService.logEvent('register_success');
           analytics.logEvent('register_success');
-        } catch (error) {
+        } catch (error: any) {
+          clarityService.logEvent('login_failed');
+          trackUserAction('register_failed', { reason: error?.response?.data?.message || 'unknown' });
           set({ isLoading: false });
           throw error;
         }

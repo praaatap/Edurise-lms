@@ -14,6 +14,7 @@ import { ArrowLeft, Pencil, TriangleAlert, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { analytics } from '@/core/services/analyticsService';
 import { clarityService } from '@/core/services/clarityService';
+import * as Sentry from '@sentry/react-native';
 import { trackUserAction } from '@/core/services/sentryPerformance';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 import {
@@ -98,6 +99,8 @@ export default function CourseContentScreen() {
           onConfirm: () => router.back()
         });
       } else if (data.type === 'QUIZ_SCORE') {
+        trackUserAction('quiz_scored', { courseId: id as string, score: data.score });
+        clarityService.logEvent('quiz_completed', { courseId: String(id), score: data.score });
         updateQuizScore(id as string, data.score);
       }
     } catch {
@@ -225,7 +228,11 @@ export default function CourseContentScreen() {
             return request.url.startsWith('https://mini-lms.local');
           }}
           onMessage={handleMessage}
-          onError={() => {
+          onError={(e) => {
+            Sentry.captureException(new Error(`WebView load failed: ${e.nativeEvent.description}`), {
+              tags: { feature: 'course_content', courseId: String(id) },
+            });
+            clarityService.logEvent('course_content_opened', { courseId: String(id), error: 'webview_load_failed' });
             setWebViewError('Could not load course content. Please check your connection and retry.');
           }}
           startInLoadingState={true}

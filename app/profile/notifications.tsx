@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useNotificationPrefsStore } from '@/features/settings/store/notificationPrefsStore';
 import { analytics } from '@/core/services/analyticsService';
+import { clarityService } from '@/core/services/clarityService';
+import { trackUserAction } from '@/core/services/sentryPerformance';
 import { useScreenTracking } from '@/shared/hooks/useScreenTracking';
 
 const CATEGORIES = [
@@ -27,12 +29,16 @@ export default function NotificationPreferencesScreen() {
   const handleMasterToggle = (value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setMasterEnabled(value);
+    clarityService.logEvent('notification_preference_changed', { category: 'master', enabled: value });
+    trackUserAction('notification_master_toggled', { enabled: value });
     analytics.logEvent('notification_toggled', { category: 'master', enabled: value });
   };
 
   const handleCategoryToggle = (key: keyof typeof categories, value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setCategoryEnabled(key, value);
+    clarityService.logEvent('notification_preference_changed', { category: key, enabled: value });
+    trackUserAction('notification_category_toggled', { category: key, enabled: value });
     analytics.logEvent('notification_toggled', { category: key, enabled: value });
   };
 
