@@ -150,8 +150,6 @@ export function WalkthroughTooltip({
     spotlightR.value = withSpring(tr, springConfig);
   }, [visible, currentStep, targets, step, insets]);
 
-  if (!visible || !step) return null;
-
   // Background overlay styles (Four-Block Cutout)
   const animatedTopBg = useAnimatedStyle(() => ({
     top: 0,
@@ -210,6 +208,8 @@ export function WalkthroughTooltip({
   const containerOpacityStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));
+
+  if (!visible || !step) return null;
 
   // Determine tooltip placement dynamically based on spotlight y position
   const targetCoords = targets[step.targetKey];

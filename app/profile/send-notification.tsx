@@ -104,7 +104,13 @@ export default function SendNotificationScreen() {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)');
+            }
+          }}
           style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.surfaceElevated, alignItems: 'center', justifyContent: 'center' }}
         >
           <ArrowLeft size={20} color={C.text} />
@@ -274,7 +280,7 @@ export default function SendNotificationScreen() {
           borderWidth: 1, borderColor: isDark ? 'rgba(99,102,241,0.2)' : '#C7D2FE',
         }}>
           <Text style={{ color: C.textMuted, fontSize: 12, lineHeight: 18 }}>
-            <Text style={{ fontWeight: '700' }}>Yes/No buttons</Text> appear on the notification banner on Android. Tapping "Yes" opens the app; tapping "No" dismisses without opening.{'\n\n'}
+            <Text style={{ fontWeight: '700' }}>Yes/No buttons</Text> appear on the notification banner on Android. Tapping &quot;Yes&quot; opens the app; tapping &quot;No&quot; dismisses without opening.{'\n\n'}
             <Text style={{ fontWeight: '700' }}>Deep links</Text> automatically route to the relevant course when tapping enrollment or re-engagement notifications.
           </Text>
         </View>

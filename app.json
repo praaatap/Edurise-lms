@@ -8,11 +8,6 @@
     "scheme": "edurise",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "statusBar": {
-      "barStyle": "auto",
-      "translucent": true,
-      "backgroundColor": "#00000000"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -37,6 +32,7 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/images/appicon.png",
           "backgroundColor": "#48C78E"
         }
       ],
@@ -110,6 +106,7 @@
     "extra": {
       "router": {},
       "eas": {
+        "projectId": "e3b1f6c9-3e0c-4160-8879-5bc2394ca0fa"
       }
     },
     "runtimeVersion": "1.0.0",

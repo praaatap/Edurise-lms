@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
-import * as Linking from "expo-linking";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
 import { usePathname, useRouter, useSegments } from "expo-router";
@@ -9,14 +8,13 @@ import {
   AppState,
   BackHandler,
   Platform,
-  useColorScheme as useNativeColorScheme,
 } from "react-native";
+import { useColorScheme } from "nativewind";
 
 import { analytics } from "@/core/services/analyticsService";
 import { clarityService } from "@/core/services/clarityService";
 import { trackScreenView } from "@/core/services/sentryPerformance";
 import { Colors } from "@/core/theme/colors";
-import { useThemeStore } from "@/core/theme/themeStore";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import {
   requestPermissions,
@@ -80,8 +78,7 @@ export function getRouteFromNotificationData(data: Record<string, any>) {
 }
 
 export function useRootLayoutController() {
-  const nativeColorScheme = useNativeColorScheme();
-  const { theme: storedTheme } = useThemeStore();
+  const { colorScheme = "light" } = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
   const pathname = usePathname();
@@ -113,8 +110,7 @@ export function useRootLayoutController() {
     message: "",
   });
 
-  const theme = storedTheme === "system" ? nativeColorScheme : storedTheme;
-  const isDark = theme === "dark";
+  const isDark = colorScheme === "dark";
   const bgColor = isDark ? Colors.dark.background : Colors.background;
 
   useEffect(() => {
@@ -213,65 +209,70 @@ export function useRootLayoutController() {
 
   useEffect(() => {
     const init = async () => {
-      void analytics.init();
-      void clarityService.initialize();
+      try {
+        void analytics.init();
+        void clarityService.initialize();
 
-      const initialUrl = await Linking.getInitialURL();
-      const initialRoute = getRouteFromUrl(initialUrl);
-      if (initialRoute) {
-        setPendingRoute(initialRoute);
-      }
+        await checkAuth();
 
-      await checkAuth();
+        const authState = useAuthStore.getState();
+        setWasAuthenticatedOnInit(authState.isAuthenticated);
 
-      const authState = useAuthStore.getState();
-      setWasAuthenticatedOnInit(authState.isAuthenticated);
+        if (authState.isAuthenticated && authState.user) {
+          clarityService.identifyUser(authState.user);
+        }
 
-      if (authState.isAuthenticated && authState.user) {
-        clarityService.identifyUser(authState.user);
-      }
-
-      const biometricEnabled = await AsyncStorage.getItem("biometric_enabled");
-      if (
-        biometricEnabled === "true" &&
-        useAuthStore.getState().isAuthenticated
-      ) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: "Unlock Edurise LMS",
-          fallbackLabel: "Use Passcode",
-        });
-
-        if (result.success) {
-          setIsUnlocked(true);
-        } else {
-          await useAuthStore.getState().logout();
-          setIsUnlocked(true);
-          setDialogConfig({
-            visible: true,
-            title: "Authentication Failed",
-            message:
-              "Your identity could not be verified. Please sign in again to continue.",
+        const biometricEnabled = await AsyncStorage.getItem("biometric_enabled");
+        if (
+          biometricEnabled === "true" &&
+          useAuthStore.getState().isAuthenticated
+        ) {
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: "Unlock Edurise LMS",
+            fallbackLabel: "Use Passcode",
           });
+
+          if (result.success) {
+            setIsUnlocked(true);
+          } else {
+            await useAuthStore.getState().logout();
+            setIsUnlocked(true);
+            setDialogConfig({
+              visible: true,
+              title: "Authentication Failed",
+              message:
+                "Your identity could not be verified. Please sign in again to continue.",
+            });
+          }
+        } else {
+          setIsUnlocked(true);
         }
-      } else {
+
+        setIsReady(true);
+
+        void (async () => {
+          const notificationsEnabled = await requestPermissions();
+          if (notificationsEnabled) {
+            await scheduleReminderNotification();
+          }
+        })();
+
+        const state = await NetInfo.fetch();
+        if (!state.isConnected) {
+          setShowOfflineScreen(true);
+        }
+      } catch (error) {
+        if (__DEV__) {
+          console.error("Initialization error:", error);
+        }
+        // Fail-safe: ensure layout is ready and unlocked so user isn't stuck
         setIsUnlocked(true);
+        setIsReady(true);
+      } finally {
+        await import("expo-splash-screen").then((mod) =>
+          mod.default.hideAsync().catch(() => {})
+        );
       }
-
-      setIsReady(true);
-
-      void (async () => {
-        const notificationsEnabled = await requestPermissions();
-        if (notificationsEnabled) {
-          await scheduleReminderNotification();
-        }
-      })();
-
-      const state = await NetInfo.fetch();
-      if (!state.isConnected) {
-        setShowOfflineScreen(true);
-      }
-
-      await import("expo-splash-screen").then((mod) => mod.default.hideAsync());
     };
 
     void init();
@@ -324,7 +325,7 @@ export function useRootLayoutController() {
     const inAuthGroup = segments[0] === "(auth)";
 
     if (!isAuthenticated && !inAuthGroup) {
-      router.replace("/(auth)/login");
+      router.replace("/(auth)/onboarding");
     } else if (isAuthenticated && inAuthGroup) {
       if (pendingRoute) {
         router.replace(pendingRoute as any);

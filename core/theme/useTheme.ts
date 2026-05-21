@@ -10,7 +10,7 @@ import { Colors } from './colors';
  *   <View style={{ backgroundColor: C.surface }} />
  */
 export function useTheme() {
-  const { colorScheme } = useColorScheme();
+  const { colorScheme = 'light' } = useColorScheme();
   const isDark = colorScheme === 'dark';
 
   const C = {

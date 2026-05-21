@@ -1,3 +1,4 @@
+import { getFloatingAiButtonBottomOffset } from '@/shared/utils/navigationLayout';
 import { useRouter } from 'expo-router';
 import { BotMessageSquare } from 'lucide-react-native';
 import { useEffect } from 'react';
@@ -21,18 +22,18 @@ export function FloatingAIBtn() {
     scale.value = withRepeat(
       withSequence(
         withTiming(1.05, { duration: 1500 }),
-        withTiming(1, { duration: 1500 })
+        withTiming(1, { duration: 1500 }),
       ),
       -1,
-      true
+      true,
     );
     lift.value = withRepeat(
       withSequence(
         withTiming(-3, { duration: 1600 }),
-        withTiming(0, { duration: 1600 })
+        withTiming(0, { duration: 1600 }),
       ),
       -1,
-      true
+      true,
     );
   }, [lift, scale]);
 
@@ -46,7 +47,7 @@ export function FloatingAIBtn() {
         animatedStyle,
         {
           position: 'absolute',
-          bottom: insets.bottom + 72,
+          bottom: getFloatingAiButtonBottomOffset(insets.bottom),
           right: 16,
           zIndex: 50,
         },
@@ -66,7 +67,10 @@ export function FloatingAIBtn() {
           elevation: 8,
         }}
       >
-        <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+        <View
+          className="w-8 h-8 rounded-full items-center justify-center"
+          style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
+        >
           <BotMessageSquare size={20} color="#FFFFFF" />
         </View>
       </TouchableOpacity>

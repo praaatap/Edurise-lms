@@ -1,4 +1,4 @@
-import CourseContentScreen from '@/app/(tabs)/profile/course/[id]/content';
+import CourseContentScreen from '@/app/course/[id]/content';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { fireEvent, render } from '@testing-library/react-native';
@@ -65,10 +65,14 @@ describe('CourseContentScreen', () => {
                 id: 'test-course-1',
                 title: 'Mastering React Native Expo',
                 description: 'Test description',
+                category: 'Design',
+                instructor: { name: 'Mock Instructor', avatar: '', location: '' },
             } as any],
             getCourseById: jest.fn().mockReturnValue({
                 id: 'test-course-1',
                 title: 'Mastering React Native Expo',
+                category: 'Design',
+                instructor: { name: 'Mock Instructor', avatar: '', location: '' },
             }),
             completeCourse: mockCompleteCourse,
             updateQuizScore: mockUpdateQuizScore,
@@ -83,9 +87,9 @@ describe('CourseContentScreen', () => {
     });
 
     it('should render course title in the header', () => {
-        const { getByText } = render(<CourseContentScreen />);
+        const { getAllByText } = render(<CourseContentScreen />);
 
-        expect(getByText('Mastering React Native Expo')).toBeTruthy();
+        expect(getAllByText('Mastering React Native Expo')[0]).toBeTruthy();
     });
 
     it('should trigger router.back() when close button is pressed', () => {

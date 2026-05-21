@@ -162,7 +162,13 @@ export default function CourseDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 140 }}
       >
-        <CourseHero insets={insets} thumbnail={course.thumbnail} />
+        <CourseHero 
+          insets={insets} 
+          thumbnail={course.thumbnail} 
+          isEnrolled={isEnrolled} 
+          isCompleted={isCompleted} 
+          lessonsCount={course.lessonsCount} 
+        />
 
         <View className="flex-1 p-6">
           <View className="flex-row items-center justify-between mb-4">
@@ -184,7 +190,7 @@ export default function CourseDetailScreen() {
             <View className="w-1 h-1 rounded-full bg-border dark:bg-dark-border mx-3" />
             <View className="flex-row items-center">
               <CirclePlay size={18} color={isDark ? '#94A3B8' : Colors.textMuted} />
-              <Text className="ml-1.5 text-sm font-medium text-text-muted dark:text-dark-text-muted">12 lessons</Text>
+              <Text className="ml-1.5 text-sm font-medium text-text-muted dark:text-dark-text-muted">{course.lessonsCount || 12} lessons</Text>
             </View>
           </View>
 
@@ -216,7 +222,10 @@ export default function CourseDetailScreen() {
               <Animated.View entering={FadeIn.duration(300)}>
                 <Text className="text-lg font-bold text-text dark:text-dark-text mb-3">Instructor</Text>
                 <Card className="flex-row items-center p-4 mb-8 border-border/40 dark:border-dark-border" >
-                  <Image source={course.instructor.avatar || `https://i.pravatar.cc/400?img=15`} className="w-14 h-14 rounded-2xl mr-4 border border-border/50" cachePolicy="memory-disk" />
+                  <View className="relative mr-4">
+                    <Image source={course.instructor.avatar || `https://i.pravatar.cc/400?img=15`} className="w-14 h-14 rounded-full border border-border/50" cachePolicy="memory-disk" />
+                    <View className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white dark:border-dark-surface bg-emerald-500" />
+                  </View>
                   <View className="flex-1">
                     <Text style={{ color: C.text }} className="text-base font-bold">{course.instructor.name}</Text>
                     <Text style={{ color: C.textMuted }} className="text-sm">{course.instructor.location}</Text>
